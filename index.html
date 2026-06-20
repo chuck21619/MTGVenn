@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kathril Ability Analyzer</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1400px;
+            margin: auto;
+            padding: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            box-sizing: border-box;
+            font-family: monospace;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+        }
+
+        .section {
+            margin-top: 30px;
+        }
+
+        .combo {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #f3f3f3;
+            border-radius: 5px;
+        }
+
+        .loading {
+            color: blue;
+        }
+
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Kathril Ability Analyzer</h1>
+
+<p>
+Paste a deck export from Archidekt, Moxfield, TappedOut, or any plain text deck list.
+</p>
+
+<textarea
+    id="deckList"
+    rows="20"
+    placeholder="1 Zetalpa, Primal Dawn
+1 Akroma, Vision of Ixidor
+1 Vampire Nighthawk">
+</textarea>
+
+<br>
+
+<button onclick="analyzeDeck()">
+    Analyze Deck
+</button>
+
+<div id="status"></div>
+
+<div class="section">
+    <h2>Ability Counts</h2>
+    <div id="abilityCounts"></div>
+</div>
+
+<div class="section">
+    <h2>Best Graveyard Cards</h2>
+    <div id="bestCards"></div>
+</div>
+
+<div class="section">
+    <h2>Ability Overlap Groups</h2>
+    <div id="overlaps"></div>
+</div>
+
+<script src="app.js"></script>
+
+</body>
+</html>
