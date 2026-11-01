@@ -1,13 +1,4 @@
 
-
-running site locally:
-	start server (i had to do this when i was making scryfall api calls)
-		charlesjohnston@charless-Air Desktop % cd projects/MTGVenn 
-		charlesjohnston@charless-Air MTGVenn % python3 -m http.server 8000
-	go to http://localhost:8000 in a browser
-
-
-
 ------------------------
 project architecture
 	static site hosted on github pages
@@ -29,6 +20,7 @@ project architecture
 
 ------------------------
 todo:
-	add counter? i want to see how many people use the site. probly something cooler to use but i kindof like the idea of an old school site counter
+	add counter? i want to see how many people use the site. probly something better to use but i kindof like the idea of an old school site counter
 	visualization - almost certainly an UpSet plot or a force graph or bubble chart.
-	
+	fix deck list parsing (i think '1x forest' doesnt work but '1 forest' does)
+	add imports via links from archidekt and moxfield

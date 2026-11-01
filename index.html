@@ -70,6 +70,48 @@
             border-radius: 5px;
         }
 
+        #upsetChoices {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 16px;
+            margin-bottom: 15px;
+        }
+
+        #upsetPlot {
+            overflow-x: auto;
+        }
+
+        .upset-band {
+            fill: var(--surface);
+        }
+
+        .upset-label, .upset-count {
+            fill: var(--text);
+            font-size: 12px;
+        }
+
+        .upset-set, .upset-bar, .upset-dot-on {
+            fill: var(--accent);
+        }
+
+        .upset-dot-off {
+            fill: var(--border);
+        }
+
+        .upset-link {
+            stroke: var(--accent);
+            stroke-width: 3;
+        }
+
+        .upset-hit {
+            fill: transparent;
+            cursor: pointer;
+        }
+
+        .upset-hit:hover {
+            fill: rgba(255, 255, 255, 0.08);
+        }
+
         .loading {
             color: var(--accent);
         }
@@ -104,6 +146,13 @@ Paste a deck export from Archidekt, Moxfield, TappedOut, or any plain text deck 
 <div id="status"></div>
 
 <div id="problems"></div>
+
+<div class="section">
+    <h2>UpSet Plot</h2>
+    <div id="upsetChoices"></div>
+    <div id="upsetPlot"></div>
+    <div id="upsetCards"></div>
+</div>
 
 <div class="section">
     <h2>Tag Counts</h2>
