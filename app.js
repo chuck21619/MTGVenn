@@ -45,11 +45,9 @@ function parseDeckLine(line) {
     if (!hasQuantity && isHeader)
         return null;
 
-    // Drop export extras (set code and number, foil marks, categories),
-    // then keep the front face, since Scryfall won't match "Fire // Ice".
+    // Drop export extras: set code and number, foil marks, categories.
     return match[2]
         .replace(/\s+(\([A-Za-z0-9]{2,6}\)|\*|\^|\[|#).*$/, "")
-        .split(" // ")[0]
         .trim();
 }
 
@@ -82,62 +80,29 @@ async function loadCardTags() {
     return cardTags;
 }
 
-async function fetchCards(cardNames) {
+function lookUpCards(cardNames) {
 
-    const cards = [];
+    const results = [];
     const notFound = [];
 
-    const batchSize = 75;
+    for (const name of cardNames) {
 
-    for (let i = 0; i < cardNames.length; i += batchSize) {
+        const positions =
+            cardTags.cards[name.toLowerCase()];
 
-        const batch =
-            cardNames.slice(i, i + batchSize);
-
-        setStatus(
-            `Fetching cards ${i + 1}-${Math.min(i + batchSize, cardNames.length)} of ${cardNames.length}`
-        );
-
-        const response = await fetch(
-            "https://api.scryfall.com/cards/collection",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    identifiers:
-                        batch.map(name => ({ name }))
-                })
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error("Failed to fetch cards from Scryfall");
+        if (!positions) {
+            notFound.push(name);
+            continue;
         }
 
-        const json = await response.json();
-
-        cards.push(...json.data);
-        notFound.push(...json.not_found.map(x => x.name));
-
-        await new Promise(resolve => setTimeout(resolve, 100));
+        results.push({
+            name,
+            tags:
+                positions.map(i => cardTags.tags[i])
+        });
     }
 
-    return { cards, notFound };
-}
-
-function extractTags(card) {
-
-    // Reversible cards keep their oracle_id on each face.
-    const oracleId =
-        card.oracle_id ||
-        card.card_faces?.[0]?.oracle_id;
-
-    const positions =
-        cardTags.cards[oracleId] || [];
-
-    return positions.map(i => cardTags.tags[i]);
+    return { results, notFound };
 }
 
 function groupCardsByTag(results) {
@@ -342,19 +307,8 @@ async function analyzeDeck() {
 
         await loadCardTags();
 
-        const { cards, notFound } =
-            await fetchCards(cardNames);
-
-        const results = [];
-
-        for (const card of cards) {
-
-            results.push({
-                name: card.name,
-                tags:
-                    extractTags(card)
-            });
-        }
+        const { results, notFound } =
+            lookUpCards(cardNames);
 
         const tagGroups =
             groupCardsByTag(results);

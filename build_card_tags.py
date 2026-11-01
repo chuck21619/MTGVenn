@@ -1,15 +1,16 @@
-"""Build card_tags.json from Scryfall's oracle-tags.json bulk file.
+"""Build card_tags.json from oracle-cards-slim.json and oracle-tags.json.
 
 Run from the project folder:  python3 build_card_tags.py
 
 Output format, kept small because the browser downloads it:
-    {"tags": ["ramp", ...], "cards": {"<oracle_id>": [0, 12, ...]}}
-Each number is a position in the "tags" list.
+    {"tags": ["ramp", ...], "cards": {"sol ring": [0, 12, ...]}}
+Card names are lowercase. Each number is a position in the "tags" list.
 """
 
 import json
 
-INPUT_FILE = "oracle-tags.json"
+CARDS_FILE = "oracle-cards-slim.json"
+TAGS_FILE = "oracle-tags.json"
 OUTPUT_FILE = "card_tags.json"
 
 # Tags that describe a card's name, printing or rules wording, not what it does.
@@ -48,7 +49,10 @@ def with_ancestors(tag, tags_by_id):
 
 
 def main():
-    with open(INPUT_FILE, encoding="utf-8") as file:
+    with open(CARDS_FILE, encoding="utf-8") as file:
+        cards = json.load(file)
+
+    with open(TAGS_FILE, encoding="utf-8") as file:
         tags = json.load(file)
 
     tags_by_id = {tag["id"]: tag for tag in tags}
@@ -64,15 +68,22 @@ def main():
         for tagging in tag["taggings"]:
             tags_for_card.setdefault(tagging["oracle_id"], set()).update(slugs)
 
-    tag_names = sorted(set().union(*tags_for_card.values()))
+    # Cards with no tags stay in the file so the site can tell them from typos.
+    tags_for_name = {}
+
+    for card in cards:
+        name = card["name"].lower()
+        slugs = tags_for_card.get(card["oracle_id"], set())
+        tags_for_name.setdefault(name, set()).update(slugs)
+
+    tag_names = sorted(set().union(*tags_for_name.values()))
     tag_positions = {slug: i for i, slug in enumerate(tag_names)}
 
     output = {
         "tags": tag_names,
         "cards": {
-            oracle_id: sorted(tag_positions[slug] for slug in slugs)
-            for oracle_id, slugs in tags_for_card.items()
-            if slugs
+            name: sorted(tag_positions[slug] for slug in slugs)
+            for name, slugs in tags_for_name.items()
         },
     }
 
