@@ -1,4 +1,4 @@
-"""Build card_tags.js from oracle-cards-slim.json and oracle-tags.json.
+"""Download Scryfall's card and tag data and build card_tags.js from it.
 
 Run from the project folder:  python3 build_card_tags.py
 
@@ -8,10 +8,11 @@ Card names are lowercase. Each number is a position in the "tags" list.
 It's a script, not JSON, so the site still works when index.html is opened directly.
 """
 
+import gzip
 import json
+import urllib.request
 
-CARDS_FILE = "oracle-cards-slim.json"
-TAGS_FILE = "oracle-tags.json"
+BULK_DATA_URL = "https://api.scryfall.com/bulk-data"
 OUTPUT_FILE = "card_tags.js"
 
 # Tags that describe a card's name, printing or rules wording, not what it does.
@@ -19,6 +20,39 @@ IGNORED_PREFIXES = ("cycle-",)
 IGNORED_TAGS = {
     "bible-reference",
 }
+
+
+def open_url(url):
+    # Scryfall rejects requests that don't send these headers.
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": "MTGVenn/1.0", "Accept": "*/*"},
+    )
+
+    return urllib.request.urlopen(request, timeout=60)
+
+
+def download_bulk_file(bulk_type):
+    """Download one Scryfall bulk file. They're gzipped, with one JSON item per line."""
+    with open_url(BULK_DATA_URL) as response:
+        bulk_files = json.load(response)["data"]
+
+    url = next(
+        bulk_file["jsonl_download_uri"]
+        for bulk_file in bulk_files
+        if bulk_file["type"] == bulk_type
+    )
+
+    print(f"Downloading {url}")
+
+    with open_url(url) as response:
+        with gzip.open(response, "rt", encoding="utf-8") as file:
+            return [json.loads(line) for line in file if line.strip()]
+
+
+def get_oracle_id(card):
+    # Reversible cards keep their oracle_id on each face.
+    return card.get("oracle_id") or card["card_faces"][0]["oracle_id"]
 
 
 def is_ignored(slug):
@@ -50,11 +84,8 @@ def with_ancestors(tag, tags_by_id):
 
 
 def main():
-    with open(CARDS_FILE, encoding="utf-8") as file:
-        cards = json.load(file)
-
-    with open(TAGS_FILE, encoding="utf-8") as file:
-        tags = json.load(file)
+    cards = download_bulk_file("oracle_cards")
+    tags = download_bulk_file("oracle_tags")
 
     tags_by_id = {tag["id"]: tag for tag in tags}
     tags_for_card = {}
@@ -74,7 +105,7 @@ def main():
 
     for card in cards:
         name = card["name"].lower()
-        slugs = tags_for_card.get(card["oracle_id"], set())
+        slugs = tags_for_card.get(get_oracle_id(card), set())
         tags_for_name.setdefault(name, set()).update(slugs)
 
     tag_names = sorted(set().union(*tags_for_name.values()))

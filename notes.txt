@@ -10,27 +10,22 @@ running site locally:
 
 ------------------------
 project architecture
-	static site, no backend: index.html + app.js + card_tags.js
+	static site hosted on github pages
+		index.html
+		app.js
+		card_tags.js - data file
+	automatic card updates: github actions
+		schedule file: update-cards.yml
+		run build_card_tags.py
+			download cards from scryfall
+			download tags from scryfall
+				have to download both because
+					cards does not include tags
+					tags is keyed by oracle id
+					so i will lookup card name in cards file to get oracle id, then lookup tags in tags using that id
+			merge files into card_tags.js
 
-	when a user analyzes a deck (browser only)
-		app.js parses the deck list
-		app.js looks up each card name in card_tags.js to get the card's tags
-		app.js builds the tag counts + overlap groups
-
-	card_tags.js is a script (not json) so index.html works when opened directly, no server needed
-
-	refreshing tag data (only me, users never run this)
-		download new oracle-cards and oracle-tags files from scryfall
-		make oracle-cards-slim.json from the cards file (just name + oracle_id)
-		run python3 build_card_tags.py - rewrites card_tags.js
-			merges card names with their tags
-			adds parent tags (mana-rock also counts as ramp)
-			drops tags in IGNORED_TAGS and tags starting with cycle-
-		commit and push card_tags.js - the site can't run without it
-
-	later
-		a daily/weekly job could do the refresh steps above
-		decide then if build_card_tags.py stays python or moves to js (js needs node)
+	
 
 ------------------------
 todo:
