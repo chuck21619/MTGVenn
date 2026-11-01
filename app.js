@@ -1,50 +1,91 @@
-const KATHRIL_ABILITIES = [
-    "flying",
-    "first strike",
-    "double strike",
-    "deathtouch",
-    "haste",
-    "hexproof",
-    "indestructible",
-    "lifelink",
-    "menace",
-    "reach",
-    "trample",
-    "vigilance"
-];
+const SECTION_HEADERS = new Set([
+    "about",
+    "commander",
+    "commanders",
+    "companion",
+    "deck",
+    "mainboard",
+    "maybeboard",
+    "sideboard"
+]);
+
+const MAX_OVERLAP_GROUPS = 25;
+
+let cardTags = null;
+
+function escapeHtml(text) {
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
 
 function setStatus(message, cssClass = "loading") {
     document.getElementById("status").innerHTML =
-        `<div class="${cssClass}">${message}</div>`;
+        `<div class="${cssClass}">${escapeHtml(message)}</div>`;
+}
+
+function parseDeckLine(line) {
+
+    const trimmed = line.trim();
+
+    if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("#"))
+        return null;
+
+    // "1 Sol Ring", "1x Sol Ring" and "Sol Ring" are all allowed.
+    const match = trimmed.match(/^(\d+x?\s+)?(.+)$/i);
+
+    const hasQuantity = Boolean(match[1]);
+
+    const isHeader =
+        SECTION_HEADERS.has(match[2].toLowerCase()) ||
+        /\(\d+\)$/.test(match[2]);
+
+    if (!hasQuantity && isHeader)
+        return null;
+
+    // Drop export extras (set code and number, foil marks, categories),
+    // then keep the front face, since Scryfall won't match "Fire // Ice".
+    return match[2]
+        .replace(/\s+(\([A-Za-z0-9]{2,6}\)|\*|\^|\[|#).*$/, "")
+        .split(" // ")[0]
+        .trim();
 }
 
 function parseDeckList(text) {
 
-    const cardNames = [];
-
-    const lines = text.split("\n");
-
-    for (const line of lines) {
-
-        const trimmed = line.trim();
-
-        if (!trimmed)
-            continue;
-
-        const match = trimmed.match(/^\d+\s+(.+)$/);
-
-        if (!match)
-            continue;
-
-        cardNames.push(match[1].trim());
-    }
+    const cardNames =
+        text
+            .split("\n")
+            .map(parseDeckLine)
+            .filter(Boolean);
 
     return [...new Set(cardNames)];
+}
+
+async function loadCardTags() {
+
+    if (cardTags)
+        return cardTags;
+
+    setStatus("Loading tag data");
+
+    const response = await fetch("card_tags.json");
+
+    if (!response.ok) {
+        throw new Error("Failed to load card_tags.json");
+    }
+
+    cardTags = await response.json();
+
+    return cardTags;
 }
 
 async function fetchCards(cardNames) {
 
     const cards = [];
+    const notFound = [];
 
     const batchSize = 75;
 
@@ -78,53 +119,87 @@ async function fetchCards(cardNames) {
         const json = await response.json();
 
         cards.push(...json.data);
+        notFound.push(...json.not_found.map(x => x.name));
 
         await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    return cards;
+    return { cards, notFound };
 }
 
-function extractAbilities(card) {
+function extractTags(card) {
 
-    const keywords =
-        (card.keywords || [])
-            .map(x => x.toLowerCase());
+    // Reversible cards keep their oracle_id on each face.
+    const oracleId =
+        card.oracle_id ||
+        card.card_faces?.[0]?.oracle_id;
 
-    return KATHRIL_ABILITIES.filter(
-        ability => keywords.includes(ability)
-    );
+    const positions =
+        cardTags.cards[oracleId] || [];
+
+    return positions.map(i => cardTags.tags[i]);
 }
 
-function renderAbilityCounts(results) {
+function groupCardsByTag(results) {
 
-    const counts = {};
-
-    KATHRIL_ABILITIES.forEach(
-        ability => counts[ability] = 0
-    );
+    const groups = {};
 
     for (const card of results) {
-        for (const ability of card.abilities) {
-            counts[ability]++;
+        for (const tag of card.tags) {
+
+            if (!groups[tag]) {
+                groups[tag] = [];
+            }
+
+            groups[tag].push(card.name);
         }
     }
 
-    let html =
-        "<table><tr><th>Ability</th><th>Count</th></tr>";
+    return Object.entries(groups)
+        .sort(
+            (a, b) =>
+                b[1].length - a[1].length ||
+                a[0].localeCompare(b[0])
+        );
+}
 
-    for (const ability of KATHRIL_ABILITIES) {
+function tagTable(entries) {
+
+    let html =
+        "<table><tr><th>Tag</th><th>Count</th><th>Cards</th></tr>";
+
+    for (const [tag, cards] of entries) {
 
         html += `
         <tr>
-            <td>${ability}</td>
-            <td>${counts[ability]}</td>
+            <td>${escapeHtml(tag)}</td>
+            <td>${cards.length}</td>
+            <td>${cards.map(escapeHtml).join(", ")}</td>
         </tr>`;
     }
 
-    html += "</table>";
+    return html + "</table>";
+}
 
-    document.getElementById("abilityCounts").innerHTML =
+function renderTagCounts(tagGroups) {
+
+    const shared =
+        tagGroups.filter(([, cards]) => cards.length > 1);
+
+    const single =
+        tagGroups.filter(([, cards]) => cards.length === 1);
+
+    let html = tagTable(shared);
+
+    if (single.length > 0) {
+        html += `
+        <details>
+            <summary>Tags on only one card (${single.length})</summary>
+            ${tagTable(single)}
+        </details>`;
+    }
+
+    document.getElementById("tagCounts").innerHTML =
         html;
 }
 
@@ -133,24 +208,24 @@ function renderBestCards(results) {
     const sorted =
         [...results].sort(
             (a, b) =>
-                b.abilities.length -
-                a.abilities.length
+                b.tags.length -
+                a.tags.length
         );
 
     let html =
-        "<table><tr><th>Card</th><th>Abilities</th></tr>";
+        "<table><tr><th>Card</th><th>Tags</th></tr>";
 
     for (const card of sorted) {
 
-        if (card.abilities.length === 0)
+        if (card.tags.length === 0)
             continue;
 
         html += `
         <tr>
-            <td>${card.name}</td>
+            <td>${escapeHtml(card.name)}</td>
             <td>
-                ${card.abilities.length}
-                (${card.abilities.join(", ")})
+                ${card.tags.length}
+                (${card.tags.map(escapeHtml).join(", ")})
             </td>
         </tr>`;
     }
@@ -161,45 +236,57 @@ function renderBestCards(results) {
         html;
 }
 
-function renderOverlapGroups(results) {
+function findOverlapGroups(tagGroups) {
 
-    const groups = {};
+    const shared =
+        tagGroups.filter(([, cards]) => cards.length > 1);
 
-    for (const card of results) {
+    const groups = new Map();
 
-        if (card.abilities.length === 0)
-            continue;
+    for (let i = 0; i < shared.length; i++) {
+        for (let j = i + 1; j < shared.length; j++) {
 
-        const key =
-            card.abilities
-                .slice()
-                .sort()
-                .join(" + ");
+            const [tagA, cardsA] = shared[i];
+            const [tagB, cardsB] = shared[j];
 
-        if (!groups[key]) {
-            groups[key] = [];
+            const overlap =
+                cardsA.filter(name => cardsB.includes(name));
+
+            // If every card with one tag has the other, the pair says nothing new.
+            if (
+                overlap.length < 2 ||
+                overlap.length === cardsA.length ||
+                overlap.length === cardsB.length
+            )
+                continue;
+
+            const key = overlap.join("|");
+
+            if (!groups.has(key)) {
+                groups.set(key, {
+                    combo: `${tagA} + ${tagB}`,
+                    cards: overlap
+                });
+            }
         }
-
-        groups[key].push(card.name);
     }
 
-    const sorted =
-        Object.entries(groups)
-            .sort(
-                (a, b) =>
-                    b[1].length -
-                    a[1].length
-            );
+    return [...groups.values()]
+        .sort((a, b) => b.cards.length - a.cards.length)
+        .slice(0, MAX_OVERLAP_GROUPS);
+}
+
+function renderOverlapGroups(tagGroups) {
 
     let html = "";
 
-    for (const [combo, cards] of sorted) {
+    for (const { combo, cards } of findOverlapGroups(tagGroups)) {
 
         html += `
         <div class="combo">
-            <strong>${combo}</strong><br>
+            <strong>${escapeHtml(combo)}</strong><br>
             ${cards.length} card(s)<br><br>
-            ${cards.join(", ")}
+            ${cards.map(escapeHtml).join(", ")}
         </div>`;
     }
 
@@ -207,11 +294,33 @@ function renderOverlapGroups(results) {
         html;
 }
 
+function renderProblems(notFound, results) {
+
+    const untagged =
+        results
+            .filter(card => card.tags.length === 0)
+            .map(card => card.name);
+
+    let html = "";
+
+    if (notFound.length > 0) {
+        html += `<p class="error">Could not find: ${notFound.map(escapeHtml).join(", ")}</p>`;
+    }
+
+    if (untagged.length > 0) {
+        html += `<p>No tags yet: ${untagged.map(escapeHtml).join(", ")}</p>`;
+    }
+
+    document.getElementById("problems").innerHTML =
+        html;
+}
+
 async function analyzeDeck() {
 
     try {
 
-        document.getElementById("abilityCounts").innerHTML = "";
+        document.getElementById("problems").innerHTML = "";
+        document.getElementById("tagCounts").innerHTML = "";
         document.getElementById("bestCards").innerHTML = "";
         document.getElementById("overlaps").innerHTML = "";
 
@@ -231,7 +340,9 @@ async function analyzeDeck() {
             `Found ${cardNames.length} cards`
         );
 
-        const cards =
+        await loadCardTags();
+
+        const { cards, notFound } =
             await fetchCards(cardNames);
 
         const results = [];
@@ -240,14 +351,18 @@ async function analyzeDeck() {
 
             results.push({
                 name: card.name,
-                abilities:
-                    extractAbilities(card)
+                tags:
+                    extractTags(card)
             });
         }
 
-        renderAbilityCounts(results);
+        const tagGroups =
+            groupCardsByTag(results);
+
+        renderProblems(notFound, results);
+        renderTagCounts(tagGroups);
         renderBestCards(results);
-        renderOverlapGroups(results);
+        renderOverlapGroups(tagGroups);
 
         setStatus(
             `Finished analyzing ${results.length} cards.`,
