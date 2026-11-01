@@ -29,4 +29,6 @@ project architecture
 
 ------------------------
 todo:
+	add counter? i want to see how many people use the site. probly something cooler to use but i kindof like the idea of an old school site counter
 	visualization - almost certainly an UpSet plot or a force graph or bubble chart.
+	
