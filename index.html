@@ -3,26 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
     <title>Kathril Ability Analyzer</title>
 
     <style>
+        :root {
+            color-scheme: dark;
+            --bg: #14161a;
+            --surface: #1e2127;
+            --border: #3a3f48;
+            --text: #e4e6ea;
+            --accent: #7fb2ff;
+            --error: #ff8a80;
+        }
+
+        html {
+            background: var(--bg);
+        }
+
         body {
             font-family: Arial, sans-serif;
             max-width: 1400px;
             margin: auto;
             padding: 20px;
+            background: var(--bg);
+            color: var(--text);
         }
 
         textarea {
             width: 100%;
             box-sizing: border-box;
             font-family: monospace;
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
         }
 
         button {
             padding: 10px 20px;
             margin-top: 10px;
             cursor: pointer;
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 5px;
         }
 
         table {
@@ -31,7 +55,7 @@
         }
 
         th, td {
-            border: 1px solid #ccc;
+            border: 1px solid var(--border);
             padding: 8px;
         }
 
@@ -42,16 +66,16 @@
         .combo {
             margin-bottom: 10px;
             padding: 10px;
-            background: #f3f3f3;
+            background: var(--surface);
             border-radius: 5px;
         }
 
         .loading {
-            color: blue;
+            color: var(--accent);
         }
 
         .error {
-            color: red;
+            color: var(--error);
         }
     </style>
 </head>
