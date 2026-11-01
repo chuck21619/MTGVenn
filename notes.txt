@@ -1,0 +1,138 @@
+One more thought: we may not even want a Venn diagram. The tag data will probably produce hundreds of tags.
+The right visualization is almost certainly an UpSet plot or a graph.
+
+
+charlesjohnston@charless-Air Desktop % cd projects/MTGVenn 
+charlesjohnston@charless-Air MTGVenn % python3 -m http.server 8000
+
+
+
+
+------------------------
+eah, this is a good point to stop and write down the architecture before coding more.
+Your instinct about not making users download datasets is right. The bulk files are application data, not user data.
+Here is the punch list I would leave myself.
+
+Project TODO
+Phase 1 — Data pipeline (do this first)
+ Decide where bulk data lives
+GitHub repo?
+GitHub release?
+Cloud storage?
+(probably repo assets first)
+ Create a daily job that:
+downloads Scryfall oracle_cards bulk file
+downloads Scryfall oracle_tags bulk file
+processes them
+ Create a processed lookup file
+Instead of shipping the giant raw files, generate something like:
+{
+  "blur": {
+    "oracle_id": "xxx",
+    "tags": [
+      "blink",
+      "card-draw"
+    ]
+  }
+}
+Then the website only downloads:
+card_tags.json
+This is a huge improvement.
+Phase 2 — Deck input
+Support:
+ Paste deck list
+Example:
+1 Sol Ring
+1 Blur
+1 Reanimate
+ Later: Archidekt URL
+ Later: Moxfield URL
+Keep the internal format the same:
+[
+  {
+    name: "Blur",
+    tags: [...]
+  }
+]
+The input source should not matter.
+Phase 3 — Card lookup
+Implement:
+ Parse pasted decklist
+ Normalize names
+Examples:
+1x Sol Ring
+Sol Ring
+1 Sol Ring
+all become:
+sol ring
+ Lookup card in processed data
+ Handle missing cards gracefully
+Example:
+Could not find:
+  Custom Card Name
+Phase 4 — Tag cleanup
+The raw tag file will have junk.
+Need filtering rules:
+Ignore:
+cycle-
+set-
+promo-
+artist-
+Probably keep:
+ramp
+draw
+removal
+blink
+tokens
+graveyard
+Create a blacklist.
+Phase 5 — Visualization
+Start simple.
+Do:
+ Tag count table
+Example:
+Ramp        12
+Draw         9
+Removal      7
+Blink        4
+ Top tag combinations
+Example:
+Ramp + Artifact
+    Sol Ring
+    Arcane Signet
+
+Blink + Draw
+    Blur
+    Ephemerate
+ Then add real visualization
+Probably:
+UpSet plot
+Force graph
+Bubble chart
+(not Venn)
+Phase 6 — GitHub Pages
+ Static frontend only
+ Deploy from main branch
+ Load generated JSON from repo
+Phase 7 — Future ideas
+ Moxfield importer
+ Archidekt importer
+ Commander recommendation
+ "Missing categories"
+Example:
+Your deck has:
+Ramp: 4
+Draw: 3
+
+Typical commander decks:
+Ramp: 10-12
+Draw: 8-10
+The biggest architectural decision you made today:
+Do not build a card database.
+The Scryfall bulk data is your database. Your job is just building the index and visualization layer.
+When you come back to it, the first thing I'd do is build a tiny script that converts:
+oracle_cards.json
+oracle_tags.json
+into:
+card_tags.json
+Everything else gets much easier after that
