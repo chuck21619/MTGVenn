@@ -1,17 +1,18 @@
-"""Build card_tags.json from oracle-cards-slim.json and oracle-tags.json.
+"""Build card_tags.js from oracle-cards-slim.json and oracle-tags.json.
 
 Run from the project folder:  python3 build_card_tags.py
 
 Output format, kept small because the browser downloads it:
-    {"tags": ["ramp", ...], "cards": {"sol ring": [0, 12, ...]}}
+    const CARD_TAGS = {"tags": ["ramp", ...], "cards": {"sol ring": [0, 12, ...]}};
 Card names are lowercase. Each number is a position in the "tags" list.
+It's a script, not JSON, so the site still works when index.html is opened directly.
 """
 
 import json
 
 CARDS_FILE = "oracle-cards-slim.json"
 TAGS_FILE = "oracle-tags.json"
-OUTPUT_FILE = "card_tags.json"
+OUTPUT_FILE = "card_tags.js"
 
 # Tags that describe a card's name, printing or rules wording, not what it does.
 IGNORED_PREFIXES = ("cycle-",)
@@ -88,7 +89,9 @@ def main():
     }
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as file:
+        file.write("const CARD_TAGS = ")
         json.dump(output, file, separators=(",", ":"))
+        file.write(";\n")
 
     print(f"Wrote {OUTPUT_FILE}: {len(output['cards'])} cards, {len(tag_names)} tags")
 

@@ -11,8 +11,6 @@ const SECTION_HEADERS = new Set([
 
 const MAX_OVERLAP_GROUPS = 25;
 
-let cardTags = null;
-
 function escapeHtml(text) {
     return String(text)
         .replace(/&/g, "&amp;")
@@ -62,24 +60,6 @@ function parseDeckList(text) {
     return [...new Set(cardNames)];
 }
 
-async function loadCardTags() {
-
-    if (cardTags)
-        return cardTags;
-
-    setStatus("Loading tag data");
-
-    const response = await fetch("card_tags.json");
-
-    if (!response.ok) {
-        throw new Error("Failed to load card_tags.json");
-    }
-
-    cardTags = await response.json();
-
-    return cardTags;
-}
-
 function lookUpCards(cardNames) {
 
     const results = [];
@@ -88,7 +68,7 @@ function lookUpCards(cardNames) {
     for (const name of cardNames) {
 
         const positions =
-            cardTags.cards[name.toLowerCase()];
+            CARD_TAGS.cards[name.toLowerCase()];
 
         if (!positions) {
             notFound.push(name);
@@ -98,7 +78,7 @@ function lookUpCards(cardNames) {
         results.push({
             name,
             tags:
-                positions.map(i => cardTags.tags[i])
+                positions.map(i => CARD_TAGS.tags[i])
         });
     }
 
@@ -280,7 +260,7 @@ function renderProblems(notFound, results) {
         html;
 }
 
-async function analyzeDeck() {
+function analyzeDeck() {
 
     try {
 
@@ -304,8 +284,6 @@ async function analyzeDeck() {
         setStatus(
             `Found ${cardNames.length} cards`
         );
-
-        await loadCardTags();
 
         const { results, notFound } =
             lookUpCards(cardNames);
