@@ -11,12 +11,20 @@ const SECTION_HEADERS = new Set([
 
 const MAX_OVERLAP_GROUPS = 25;
 
-const UPSET_TAG_CHOICES = 30;
-const UPSET_DEFAULT_TAGS = 10;
+const TAG_CHOICES = 30;
+const DEFAULT_TAGS = 10;
 const UPSET_MAX_COLUMNS = 20;
 
-let upsetResults = [];
+const FORCE_HEIGHT = 600;
+const FORCE_PADDING = 40;
+const FORCE_TICKS = 300;
+
+let deckResults = [];
 let upsetIntersections = [];
+let forceNodes = [];
+let forceLinks = [];
+let hoveredNode = null;
+let selectedNode = null;
 
 function escapeHtml(text) {
     return String(text)
@@ -135,57 +143,8 @@ function tagTable(entries) {
 
 function renderTagCounts(tagGroups) {
 
-    const shared =
-        tagGroups.filter(([, cards]) => cards.length > 1);
-
-    const single =
-        tagGroups.filter(([, cards]) => cards.length === 1);
-
-    let html = tagTable(shared);
-
-    if (single.length > 0) {
-        html += `
-        <details>
-            <summary>Tags on only one card (${single.length})</summary>
-            ${tagTable(single)}
-        </details>`;
-    }
-
     document.getElementById("tagCounts").innerHTML =
-        html;
-}
-
-function renderBestCards(results) {
-
-    const sorted =
-        [...results].sort(
-            (a, b) =>
-                b.tags.length -
-                a.tags.length
-        );
-
-    let html =
-        "<table><tr><th>Card</th><th>Tags</th></tr>";
-
-    for (const card of sorted) {
-
-        if (card.tags.length === 0)
-            continue;
-
-        html += `
-        <tr>
-            <td>${escapeHtml(card.name)}</td>
-            <td>
-                ${card.tags.length}
-                (${card.tags.map(escapeHtml).join(", ")})
-            </td>
-        </tr>`;
-    }
-
-    html += "</table>";
-
-    document.getElementById("bestCards").innerHTML =
-        html;
+        tagTable(tagGroups);
 }
 
 function findOverlapGroups(tagGroups) {
@@ -246,16 +205,16 @@ function renderOverlapGroups(tagGroups) {
         html;
 }
 
-function renderUpsetChoices(tagGroups) {
+function renderTagChoices(tagGroups) {
 
     let html = "";
 
     tagGroups
-        .slice(0, UPSET_TAG_CHOICES)
+        .slice(0, TAG_CHOICES)
         .forEach(([tag, cards], i) => {
 
             const checked =
-                i < UPSET_DEFAULT_TAGS ? "checked" : "";
+                i < DEFAULT_TAGS ? "checked" : "";
 
             html += `
             <label>
@@ -263,19 +222,19 @@ function renderUpsetChoices(tagGroups) {
                     type="checkbox"
                     value="${escapeHtml(tag)}"
                     ${checked}
-                    onchange="renderUpsetPlot()">
+                    onchange="renderTagCharts()">
                 ${escapeHtml(tag)} (${cards.length})
             </label>`;
         });
 
-    document.getElementById("upsetChoices").innerHTML =
+    document.getElementById("tagChoices").innerHTML =
         html;
 }
 
-function selectedUpsetTags() {
+function selectedTags() {
 
     const boxes =
-        document.querySelectorAll("#upsetChoices input:checked");
+        document.querySelectorAll("#tagChoices input:checked");
 
     return [...boxes].map(box => box.value);
 }
@@ -324,7 +283,7 @@ function upsetSvg(tags, intersections) {
 
     const setSizes =
         tags.map(tag =>
-            upsetResults.filter(card => card.tags.includes(tag)).length
+            deckResults.filter(card => card.tags.includes(tag)).length
         );
 
     const maxSet = Math.max(...setSizes);
@@ -394,10 +353,10 @@ function showIntersection(index) {
 
 function renderUpsetPlot() {
 
-    const tags = selectedUpsetTags();
+    const tags = selectedTags();
 
     upsetIntersections =
-        findIntersections(upsetResults, tags);
+        findIntersections(deckResults, tags);
 
     document.getElementById("upsetCards").innerHTML = "";
 
@@ -405,6 +364,276 @@ function renderUpsetPlot() {
         upsetIntersections.length > 0
             ? upsetSvg(tags, upsetIntersections)
             : "<p>Pick at least one tag to see the plot.</p>";
+}
+
+function buildForceGraph(results, tags, minShared) {
+
+    const nodes =
+        results
+            .map(card => ({
+                name: card.name,
+                tags: tags.filter(tag => card.tags.includes(tag)),
+                x: 0,
+                y: 0,
+                vx: 0,
+                vy: 0,
+                links: 0
+            }))
+            .filter(node => node.tags.length > 0);
+
+    const links = [];
+
+    for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+
+            const shared =
+                nodes[i].tags.filter(tag => nodes[j].tags.includes(tag));
+
+            if (shared.length < minShared)
+                continue;
+
+            links.push({ a: nodes[i], b: nodes[j], shared });
+
+            nodes[i].links++;
+            nodes[j].links++;
+        }
+    }
+
+    return { nodes, links };
+}
+
+function layOutForceGraph(nodes, links, width, height) {
+
+    const repulsion = 2000;
+    const linkLength = 60;
+
+    // Start on a spiral so the same deck always gets the same layout.
+    nodes.forEach((node, i) => {
+        const angle = i * 2.4;
+        const distance = 10 * Math.sqrt(i + 1);
+
+        node.x = Math.cos(angle) * distance;
+        node.y = Math.sin(angle) * distance;
+    });
+
+    for (let tick = 0; tick < FORCE_TICKS; tick++) {
+
+        const cooling = 1 - tick / FORCE_TICKS;
+
+        for (let i = 0; i < nodes.length; i++) {
+            for (let j = i + 1; j < nodes.length; j++) {
+
+                const dx = nodes[j].x - nodes[i].x;
+                const dy = nodes[j].y - nodes[i].y;
+                const distanceSquared = Math.max(dx * dx + dy * dy, 1);
+                const distance = Math.sqrt(distanceSquared);
+                const push = repulsion / distanceSquared * cooling;
+
+                nodes[i].vx -= dx / distance * push;
+                nodes[i].vy -= dy / distance * push;
+                nodes[j].vx += dx / distance * push;
+                nodes[j].vy += dy / distance * push;
+            }
+        }
+
+        for (const { a, b, shared } of links) {
+
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const distance = Math.max(Math.hypot(dx, dy), 1);
+            const pull = (distance - linkLength) * 0.005 * shared.length * cooling;
+
+            a.vx += dx / distance * pull;
+            a.vy += dy / distance * pull;
+            b.vx -= dx / distance * pull;
+            b.vy -= dy / distance * pull;
+        }
+
+        for (const node of nodes) {
+
+            node.vx = (node.vx - node.x * 0.02 * cooling) * 0.6;
+            node.vy = (node.vy - node.y * 0.02 * cooling) * 0.6;
+
+            node.x += node.vx;
+            node.y += node.vy;
+        }
+    }
+
+    // Stretch the finished layout to fill the canvas.
+    const xs = nodes.map(node => node.x);
+    const ys = nodes.map(node => node.y);
+
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const spanX = Math.max(Math.max(...xs) - minX, 1);
+    const spanY = Math.max(Math.max(...ys) - minY, 1);
+
+    for (const node of nodes) {
+        node.x = FORCE_PADDING + (node.x - minX) / spanX * (width - FORCE_PADDING * 2);
+        node.y = FORCE_PADDING + (node.y - minY) / spanY * (height - FORCE_PADDING * 2);
+    }
+}
+
+function nodeRadius(node) {
+
+    const mostLinks =
+        Math.max(...forceNodes.map(x => x.links), 1);
+
+    return 4 + 10 * node.links / mostLinks;
+}
+
+function drawForceGraph() {
+
+    const canvas = document.getElementById("forceCanvas");
+    const context = canvas.getContext("2d");
+    const scale = window.devicePixelRatio || 1;
+
+    const style = getComputedStyle(document.documentElement);
+    const accent = style.getPropertyValue("--accent");
+    const muted = style.getPropertyValue("--border");
+    const text = style.getPropertyValue("--text");
+
+    const active = hoveredNode || selectedNode;
+
+    const isActiveLink =
+        link => link.a === active || link.b === active;
+
+    const neighbors = new Set();
+
+    for (const link of forceLinks) {
+        if (isActiveLink(link)) {
+            neighbors.add(link.a);
+            neighbors.add(link.b);
+        }
+    }
+
+    context.setTransform(scale, 0, 0, scale, 0, 0);
+    context.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (const link of forceLinks) {
+
+        const highlight = isActiveLink(link);
+
+        context.strokeStyle = highlight ? accent : muted;
+        context.globalAlpha = highlight || !active ? 0.7 : 0.15;
+        context.lineWidth = highlight ? 2 : 1;
+
+        context.beginPath();
+        context.moveTo(link.a.x, link.a.y);
+        context.lineTo(link.b.x, link.b.y);
+        context.stroke();
+    }
+
+    for (const node of forceNodes) {
+
+        context.fillStyle = accent;
+        context.globalAlpha = !active || neighbors.has(node) || node === active ? 1 : 0.3;
+
+        context.beginPath();
+        context.arc(node.x, node.y, nodeRadius(node), 0, Math.PI * 2);
+        context.fill();
+    }
+
+    context.globalAlpha = 1;
+    context.fillStyle = text;
+    context.font = "12px Arial, sans-serif";
+
+    const labeled = active ? [...neighbors, active] : [];
+
+    for (const node of labeled) {
+        context.fillText(node.name, node.x + nodeRadius(node) + 3, node.y + 4);
+    }
+}
+
+function nodeAt(x, y) {
+
+    return forceNodes.find(node =>
+        Math.hypot(node.x - x, node.y - y) <= nodeRadius(node) + 3
+    ) || null;
+}
+
+function showForceNode(node) {
+
+    selectedNode = node;
+
+    const connections =
+        forceLinks
+            .filter(link => link.a === node || link.b === node)
+            .map(link => ({
+                name: link.a === node ? link.b.name : link.a.name,
+                shared: link.shared
+            }))
+            .sort((a, b) => b.shared.length - a.shared.length);
+
+    let html = "";
+
+    if (node) {
+
+        html = `
+        <div class="combo">
+            <strong>${escapeHtml(node.name)}</strong><br>
+            ${connections.length} connected card(s)<br><br>`;
+
+        for (const { name, shared } of connections) {
+            html += `${escapeHtml(name)} (${shared.map(escapeHtml).join(", ")})<br>`;
+        }
+
+        html += "</div>";
+    }
+
+    document.getElementById("forceCards").innerHTML =
+        html;
+}
+
+function renderForceGraph() {
+
+    const canvas = document.getElementById("forceCanvas");
+    const width = canvas.parentElement.clientWidth;
+    const scale = window.devicePixelRatio || 1;
+
+    const minShared =
+        Number(document.getElementById("forceMinShared").value) || 1;
+
+    const { nodes, links } =
+        buildForceGraph(deckResults, selectedTags(), minShared);
+
+    forceNodes = nodes;
+    forceLinks = links;
+    hoveredNode = null;
+
+    showForceNode(null);
+
+    canvas.width = width * scale;
+    canvas.height = FORCE_HEIGHT * scale;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${FORCE_HEIGHT}px`;
+
+    if (nodes.length > 0) {
+        layOutForceGraph(nodes, links, width, FORCE_HEIGHT);
+    }
+
+    canvas.onmousemove = event => {
+        hoveredNode = nodeAt(event.offsetX, event.offsetY);
+        canvas.style.cursor = hoveredNode ? "pointer" : "default";
+        drawForceGraph();
+    };
+
+    canvas.onmouseleave = () => {
+        hoveredNode = null;
+        drawForceGraph();
+    };
+
+    canvas.onclick = event => {
+        showForceNode(nodeAt(event.offsetX, event.offsetY));
+        drawForceGraph();
+    };
+
+    drawForceGraph();
+}
+
+function renderTagCharts() {
+    renderUpsetPlot();
+    renderForceGraph();
 }
 
 function renderProblems(notFound, results) {
@@ -428,16 +657,21 @@ function renderProblems(notFound, results) {
         html;
 }
 
+function loadSampleDeck() {
+    document.getElementById("deckList").value =
+        SAMPLE_DECK_LIST.trim();
+}
+
 function analyzeDeck() {
 
     try {
 
         document.getElementById("problems").innerHTML = "";
-        document.getElementById("upsetChoices").innerHTML = "";
+        document.getElementById("tagChoices").innerHTML = "";
         document.getElementById("upsetPlot").innerHTML = "";
         document.getElementById("upsetCards").innerHTML = "";
+        document.getElementById("forceCards").innerHTML = "";
         document.getElementById("tagCounts").innerHTML = "";
-        document.getElementById("bestCards").innerHTML = "";
         document.getElementById("overlaps").innerHTML = "";
 
         const deckText =
@@ -462,13 +696,12 @@ function analyzeDeck() {
         const tagGroups =
             groupCardsByTag(results);
 
-        upsetResults = results;
+        deckResults = results;
 
         renderProblems(notFound, results);
-        renderUpsetChoices(tagGroups);
-        renderUpsetPlot();
+        renderTagChoices(tagGroups);
+        renderTagCharts();
         renderTagCounts(tagGroups);
-        renderBestCards(results);
         renderOverlapGroups(tagGroups);
 
         setStatus(

@@ -15,11 +15,8 @@ import urllib.request
 BULK_DATA_URL = "https://api.scryfall.com/bulk-data"
 OUTPUT_FILE = "card_tags.js"
 
-# Tags that describe a card's name, printing or rules wording, not what it does.
+# Tags for a card's printing cycle, not what it does.
 IGNORED_PREFIXES = ("cycle-",)
-IGNORED_TAGS = {
-    "bible-reference",
-}
 
 
 def open_url(url):
@@ -56,7 +53,7 @@ def get_oracle_id(card):
 
 
 def is_ignored(slug):
-    return slug in IGNORED_TAGS or slug.startswith(IGNORED_PREFIXES)
+    return slug.startswith(IGNORED_PREFIXES)
 
 
 def with_ancestors(tag, tags_by_id):

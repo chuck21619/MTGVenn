@@ -1,3 +1,5 @@
+// Double-click the page title to fill the deck list with this deck.
+const SAMPLE_DECK_LIST = `
 1 Adventuring Gear
 1 Aesi, Tyrant of Gyre Strait
 1 Aqueous Form
@@ -88,3 +90,4 @@
 1 Willowrush Verge
 1 Yavimaya, Cradle of Growth
 1 Zhalfirin Void
+`;

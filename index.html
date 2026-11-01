@@ -63,6 +63,14 @@
             margin-top: 30px;
         }
 
+        summary {
+            cursor: pointer;
+        }
+
+        summary h2 {
+            display: inline;
+        }
+
         .combo {
             margin-bottom: 10px;
             padding: 10px;
@@ -70,7 +78,7 @@
             border-radius: 5px;
         }
 
-        #upsetChoices {
+        #tagChoices {
             display: flex;
             flex-wrap: wrap;
             gap: 4px 16px;
@@ -79,6 +87,18 @@
 
         #upsetPlot {
             overflow-x: auto;
+        }
+
+        #forceGraph {
+            margin-top: 10px;
+        }
+
+        #forceMinShared {
+            width: 50px;
+        }
+
+        #forceCanvas {
+            display: block;
         }
 
         .upset-band {
@@ -123,7 +143,7 @@
 </head>
 <body>
 
-<h1>MTG Deck Tag Analyzer</h1>
+<h1 ondblclick="loadSampleDeck()">MTG Deck Tag Analyzer</h1>
 
 <p>
 Paste a deck export from Archidekt, Moxfield, TappedOut, or any plain text deck list.
@@ -148,28 +168,46 @@ Paste a deck export from Archidekt, Moxfield, TappedOut, or any plain text deck 
 <div id="problems"></div>
 
 <div class="section">
+    <h2>Tags to Show</h2>
+    <div id="tagChoices"></div>
+</div>
+
+<div class="section">
     <h2>UpSet Plot</h2>
-    <div id="upsetChoices"></div>
     <div id="upsetPlot"></div>
     <div id="upsetCards"></div>
 </div>
 
 <div class="section">
-    <h2>Tag Counts</h2>
+    <h2>Force Graph</h2>
+    <label>
+        Connect cards sharing at least
+        <input
+            id="forceMinShared"
+            type="number"
+            min="1"
+            value="2"
+            onchange="renderForceGraph()">
+        selected tags
+    </label>
+    <div id="forceGraph">
+        <canvas id="forceCanvas" height="0"></canvas>
+    </div>
+    <div id="forceCards"></div>
+</div>
+
+<details class="section">
+    <summary><h2>Tag Counts</h2></summary>
     <div id="tagCounts"></div>
-</div>
+</details>
 
-<div class="section">
-    <h2>Most Tagged Cards</h2>
-    <div id="bestCards"></div>
-</div>
-
-<div class="section">
-    <h2>Tag Overlap Groups</h2>
+<details class="section">
+    <summary><h2>Tag Overlap Groups</h2></summary>
     <div id="overlaps"></div>
-</div>
+</details>
 
 <script src="card_tags.js"></script>
+<script src="sampleDeckList.js"></script>
 <script src="app.js"></script>
 
 </body>
