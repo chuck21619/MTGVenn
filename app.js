@@ -14,6 +14,7 @@ const MAX_OVERLAP_GROUPS = 25;
 const TAG_CHOICES = 30;
 const DEFAULT_TAGS = 10;
 const SAVED_TAGS_KEY = "mtgvenn-selected-tags";
+const SAVED_SECTIONS_KEY = "mtgvenn-open-sections";
 const UPSET_MAX_COLUMNS = 20;
 
 const FORCE_HEIGHT = 600;
@@ -26,6 +27,7 @@ let forceNodes = [];
 let forceLinks = [];
 let hoveredNode = null;
 let selectedNode = null;
+let tagCountEntries = [];
 
 function escapeHtml(text) {
     return String(text)
@@ -124,28 +126,93 @@ function groupCardsByTag(results) {
         );
 }
 
-function tagTable(entries) {
+function selectedTagGroups() {
 
-    let html =
-        "<table><tr><th>Tag</th><th>Count</th><th>Cards</th></tr>";
+    const tags = selectedTags();
 
-    for (const [tag, cards] of entries) {
-
-        html += `
-        <tr>
-            <td>${escapeHtml(tag)}</td>
-            <td>${cards.length}</td>
-            <td>${cards.map(escapeHtml).join(", ")}</td>
-        </tr>`;
-    }
-
-    return html + "</table>";
+    return groupCardsByTag(deckResults)
+        .filter(([tag]) => tags.includes(tag));
 }
 
-function renderTagCounts(tagGroups) {
+function tagCountsSvg(entries) {
+
+    const left = 110;
+    const top = 25;
+    const plotHeight = 300;
+    const bottom = 130;
+    const columnWidth = 36;
+
+    const width = left + entries.length * columnWidth + 20;
+    const height = top + plotHeight + bottom;
+    const baseline = top + plotHeight;
+
+    const mostCards =
+        Math.max(...entries.map(([, cards]) => cards.length));
+
+    const tickStep = Math.max(Math.ceil(mostCards / 5), 1);
+
+    const scaleY = value => baseline - value / mostCards * plotHeight;
+
+    let svg = `<svg width="${width}" height="${height}" role="img" aria-label="Bar graph of cards per tag">`;
+
+    for (let value = 0; value <= mostCards; value += tickStep) {
+        svg += `
+        <line class="count-grid" x1="${left}" x2="${width - 20}" y1="${scaleY(value)}" y2="${scaleY(value)}"></line>
+        <text class="count-text" x="${left - 8}" y="${scaleY(value) + 4}" text-anchor="end">${value}</text>`;
+    }
+
+    svg += `<text class="count-text" x="${left - 45}" y="${baseline - plotHeight / 2}" text-anchor="middle" transform="rotate(-90 ${left - 45} ${baseline - plotHeight / 2})">Cards</text>`;
+
+    entries.forEach(([tag, cards], i) => {
+
+        const x = left + i * columnWidth;
+        const center = x + columnWidth / 2;
+        const barTop = scaleY(cards.length);
+
+        svg += `
+        <g class="count-column" onmousemove="showTagCards(event, ${i})" onclick="showTagCards(event, ${i})" onmouseleave="hideTagCards()">
+            <rect class="count-hit" x="${x}" y="${top}" width="${columnWidth}" height="${plotHeight}"></rect>
+            <rect class="count-bar" x="${x + 6}" y="${barTop}" width="${columnWidth - 12}" height="${baseline - barTop}"></rect>
+            <text class="count-text" x="${center}" y="${barTop - 5}" text-anchor="middle">${cards.length}</text>
+            <text class="count-text" x="${center + 3}" y="${baseline + 14}" text-anchor="end" transform="rotate(-45 ${center + 3} ${baseline + 14})">${escapeHtml(tag)}</text>
+        </g>`;
+    });
+
+    return svg + "</svg>";
+}
+
+function showTagCards(event, index) {
+
+    const [tag, cards] = tagCountEntries[index];
+
+    const tooltip = document.getElementById("tagCardsTooltip");
+
+    tooltip.innerHTML = `
+        <strong>${escapeHtml(tag)}</strong> (${cards.length})<br>
+        ${cards.map(escapeHtml).join(", ")}`;
+
+    tooltip.style.display = "block";
+
+    // Keep the box on screen when the pointer is near an edge.
+    const x = Math.min(event.clientX + 14, window.innerWidth - tooltip.offsetWidth - 8);
+    const y = Math.min(event.clientY + 14, window.innerHeight - tooltip.offsetHeight - 8);
+
+    tooltip.style.left = `${Math.max(x, 8)}px`;
+    tooltip.style.top = `${Math.max(y, 8)}px`;
+}
+
+function hideTagCards() {
+    document.getElementById("tagCardsTooltip").style.display = "none";
+}
+
+function renderTagCounts() {
+
+    tagCountEntries = selectedTagGroups();
+
+    hideTagCards();
 
     document.getElementById("tagCounts").innerHTML =
-        tagTable(tagGroups);
+        tagCountEntries.length > 0 ? tagCountsSvg(tagCountEntries) : "";
 }
 
 function findOverlapGroups(tagGroups) {
@@ -190,15 +257,9 @@ function findOverlapGroups(tagGroups) {
 
 function renderOverlapGroups() {
 
-    const tags = selectedTags();
-
-    const tagGroups =
-        groupCardsByTag(deckResults)
-            .filter(([tag]) => tags.includes(tag));
-
     let html = "";
 
-    for (const { combo, cards } of findOverlapGroups(tagGroups)) {
+    for (const { combo, cards } of findOverlapGroups(selectedTagGroups())) {
 
         html += `
         <div class="combo">
@@ -641,6 +702,10 @@ function renderForceGraph() {
 
     const canvas = document.getElementById("forceCanvas");
     const width = canvas.parentElement.clientWidth;
+
+    // A collapsed section has no width, so this reruns when it's reopened.
+    if (deckResults.length === 0 || width === 0)
+        return;
     const scale = window.devicePixelRatio || 1;
 
     const minShared =
@@ -742,6 +807,7 @@ function renderTagCharts() {
     renderForceGraph();
     renderCardGrid();
     renderOverlapGroups();
+    renderTagCounts();
 }
 
 function renderProblems(notFound, results) {
@@ -810,7 +876,6 @@ function analyzeDeck() {
         renderProblems(notFound, results);
         renderTagChoices(tagGroups);
         renderTagCharts();
-        renderTagCounts(tagGroups);
 
         setStatus(
             `Finished analyzing ${results.length} cards.`,
@@ -827,3 +892,37 @@ function analyzeDeck() {
         );
     }
 }
+
+// The deck list has no id, so it always loads expanded.
+function setUpSavedSections() {
+
+    let saved = {};
+
+    try {
+        saved = JSON.parse(localStorage.getItem(SAVED_SECTIONS_KEY)) || {};
+    } catch {
+        saved = {};
+    }
+
+    const sections = document.querySelectorAll("details[id]");
+
+    for (const section of sections) {
+
+        if (section.id in saved) {
+            section.open = saved[section.id];
+        }
+
+        section.addEventListener("toggle", () => {
+
+            saved[section.id] = section.open;
+
+            try {
+                localStorage.setItem(SAVED_SECTIONS_KEY, JSON.stringify(saved));
+            } catch {
+                // The sections still work, they just won't be remembered.
+            }
+        });
+    }
+}
+
+setUpSavedSections();
