@@ -24,3 +24,4 @@ todo:
 	fix deck list parsing (i think '1x forest' doesnt work but '1 forest' does)
 	add imports via links from archidekt and moxfield
 	change tag counts to pie chart or word cloud
+	change tag selections to include every tag

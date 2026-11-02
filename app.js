@@ -11,7 +11,7 @@ const SECTION_HEADERS = new Set([
 
 const MAX_OVERLAP_GROUPS = 25;
 
-const TAG_CHOICES = 30;
+const SHORT_TAG_LIST = 30;
 const DEFAULT_TAGS = 10;
 const SAVED_TAGS_KEY = "mtgvenn-selected-tags";
 const SAVED_SECTIONS_KEY = "mtgvenn-open-sections";
@@ -28,6 +28,7 @@ let forceLinks = [];
 let hoveredNode = null;
 let selectedNode = null;
 let tagCountEntries = [];
+let showAllTags = false;
 
 function escapeHtml(text) {
     return String(text)
@@ -305,6 +306,7 @@ function saveSelectedTags() {
 
 function tagSelectionChanged() {
     saveSelectedTags();
+    renderTagSummary();
     renderTagCharts();
 }
 
@@ -312,15 +314,12 @@ function renderTagChoices(tagGroups) {
 
     let html = "";
 
-    const choices =
-        tagGroups.slice(0, TAG_CHOICES);
-
     const saved = loadSavedTags();
 
     const useSaved =
-        choices.some(([tag]) => saved.includes(tag));
+        tagGroups.some(([tag]) => saved.includes(tag));
 
-    choices
+    tagGroups
         .forEach(([tag, cards], i) => {
 
             const isChosen =
@@ -336,12 +335,70 @@ function renderTagChoices(tagGroups) {
                     value="${escapeHtml(tag)}"
                     ${checked}
                     onchange="tagSelectionChanged()">
-                ${escapeHtml(tag)} (${cards.length})
+                <span>${escapeHtml(tag)}</span>
+                <span class="tag-count">${cards.length}</span>
             </label>`;
         });
 
     document.getElementById("tagChoices").innerHTML =
         html;
+
+    document.getElementById("tagControls").hidden = false;
+    document.getElementById("tagSearch").value = "";
+
+    showAllTags = false;
+
+    filterTagChoices();
+    renderTagSummary();
+}
+
+function filterTagChoices() {
+
+    const search =
+        document.getElementById("tagSearch")
+            .value.trim().toLowerCase().replace(/\s+/g, "-");
+
+    const labels =
+        document.querySelectorAll("#tagChoices label");
+
+    labels.forEach((label, i) => {
+
+        const box = label.querySelector("input");
+
+        // Checked tags stay visible so nothing selected is hidden.
+        const isListed =
+            showAllTags || i < SHORT_TAG_LIST || box.checked;
+
+        label.hidden =
+            search ? !box.value.includes(search) : !isListed;
+    });
+
+    document.getElementById("tagShowAll").textContent =
+        showAllTags ? "Show fewer tags" : `Show all ${labels.length} tags`;
+}
+
+function toggleAllTags() {
+    showAllTags = !showAllTags;
+    filterTagChoices();
+}
+
+function clearAllTags() {
+
+    for (const box of document.querySelectorAll("#tagChoices input")) {
+        box.checked = false;
+    }
+
+    filterTagChoices();
+    tagSelectionChanged();
+}
+
+function renderTagSummary() {
+
+    const total =
+        document.querySelectorAll("#tagChoices input").length;
+
+    document.getElementById("tagSummary").textContent =
+        `${selectedTags().length} of ${total} tags selected`;
 }
 
 function selectedTags() {

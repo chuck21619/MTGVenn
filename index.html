@@ -79,10 +79,55 @@
         }
 
         #tagChoices {
+            max-width: 420px;
+            margin-bottom: 15px;
+        }
+
+        #tagChoices label {
+            display: flex;
+            gap: 8px;
+            padding: 3px 6px;
+            cursor: pointer;
+        }
+
+        #tagChoices label[hidden] {
+            display: none;
+        }
+
+        #tagChoices label:hover {
+            background: var(--surface);
+        }
+
+        .tag-count {
+            margin-left: auto;
+        }
+
+        #tagControls {
             display: flex;
             flex-wrap: wrap;
-            gap: 4px 16px;
+            align-items: center;
+            gap: 10px;
             margin-bottom: 15px;
+        }
+
+        #tagControls[hidden] {
+            display: none;
+        }
+
+        #tagControls button {
+            margin-top: 0;
+        }
+
+        #tagClearAll {
+            margin-left: auto;
+        }
+
+        #tagSearch {
+            padding: 9px;
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 5px;
         }
 
         #upsetPlot {
@@ -252,6 +297,16 @@ Paste a deck export from Archidekt, Moxfield, TappedOut, or any plain text deck 
 
 <details id="tagsSection" class="section" open>
     <summary><h2>Tags to Show</h2></summary>
+    <div id="tagControls" hidden>
+        <input
+            id="tagSearch"
+            type="search"
+            placeholder="Search tags"
+            oninput="filterTagChoices()">
+        <button id="tagShowAll" onclick="toggleAllTags()"></button>
+        <span id="tagSummary"></span>
+        <button id="tagClearAll" onclick="clearAllTags()">Clear all</button>
+    </div>
     <div id="tagChoices"></div>
 </details>
 
