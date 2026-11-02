@@ -132,6 +132,48 @@
             fill: rgba(255, 255, 255, 0.08);
         }
 
+        #cardGrid {
+            overflow-x: auto;
+        }
+
+        #cardGrid table {
+            width: auto;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        #cardGrid th {
+            vertical-align: bottom;
+        }
+
+        .grid-tag {
+            padding: 6px 4px;
+            font-size: 12px;
+            font-weight: normal;
+        }
+
+        .grid-tag span {
+            display: inline-block;
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+            white-space: nowrap;
+        }
+
+        .grid-card {
+            padding: 2px 8px;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .grid-on, .grid-off {
+            min-width: 18px;
+            padding: 0;
+        }
+
+        .grid-on {
+            background: var(--accent);
+        }
+
         .loading {
             color: var(--accent);
         }
@@ -194,6 +236,12 @@ Paste a deck export from Archidekt, Moxfield, TappedOut, or any plain text deck 
         <canvas id="forceCanvas" height="0"></canvas>
     </div>
     <div id="forceCards"></div>
+</div>
+
+<div class="section">
+    <h2>Card Grid</h2>
+    <p>Rows are cards and columns are tags. Rows with few squares may not fit the deck.</p>
+    <div id="cardGrid"></div>
 </div>
 
 <details class="section">

@@ -683,9 +683,64 @@ function renderForceGraph() {
     drawForceGraph();
 }
 
+function renderCardGrid() {
+
+    const tags = selectedTags();
+
+    const grid = document.getElementById("cardGrid");
+
+    if (tags.length === 0) {
+        grid.innerHTML = "<p>Pick at least one tag to see the grid.</p>";
+        return;
+    }
+
+    // Sorting on which tags each card has puts similar cards next to each other.
+    const rows =
+        deckResults
+            .map(card => ({
+                name: card.name,
+                has: tags.map(tag => card.tags.includes(tag))
+            }))
+            .map(row => ({
+                ...row,
+                key: row.has.map(Number).join("")
+            }))
+            .sort(
+                (a, b) =>
+                    b.key.localeCompare(a.key) ||
+                    a.name.localeCompare(b.name)
+            );
+
+    let html = "<table><tr><th>Card</th>";
+
+    for (const tag of tags) {
+        html += `<th class="grid-tag"><span>${escapeHtml(tag)}</span></th>`;
+    }
+
+    html += "</tr>";
+
+    for (const { name, has } of rows) {
+
+        html += `<tr><td class="grid-card">${escapeHtml(name)}</td>`;
+
+        has.forEach((hasTag, i) => {
+
+            const cssClass =
+                hasTag ? "grid-on" : "grid-off";
+
+            html += `<td class="${cssClass}" title="${escapeHtml(name)}: ${escapeHtml(tags[i])}"></td>`;
+        });
+
+        html += "</tr>";
+    }
+
+    grid.innerHTML = html + "</table>";
+}
+
 function renderTagCharts() {
     renderUpsetPlot();
     renderForceGraph();
+    renderCardGrid();
     renderOverlapGroups();
 }
 
@@ -724,6 +779,7 @@ function analyzeDeck() {
         document.getElementById("upsetPlot").innerHTML = "";
         document.getElementById("upsetCards").innerHTML = "";
         document.getElementById("forceCards").innerHTML = "";
+        document.getElementById("cardGrid").innerHTML = "";
         document.getElementById("tagCounts").innerHTML = "";
         document.getElementById("overlaps").innerHTML = "";
 

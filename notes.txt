@@ -21,8 +21,6 @@ project architecture
 ------------------------
 todo:
 	add counter? i want to see how many people use the site. probly something better to use but i kindof like the idea of an old school site counter
-	visualization - almost certainly an UpSet plot or a force graph or bubble chart.
 	fix deck list parsing (i think '1x forest' doesnt work but '1 forest' does)
 	add imports via links from archidekt and moxfield
-	add default tags to show? then a dropdown to show lesser used tags
-	save tag selections per user - is there a way to save per deck?
+	change tag counts to pie chart or word cloud
