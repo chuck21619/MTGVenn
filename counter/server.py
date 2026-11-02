@@ -13,7 +13,9 @@ import threading
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-ALLOWED_ORIGIN = "https://chuck21619.github.io"
+# Browsers send "null" as the origin for a page opened directly from a file.
+LIVE_ORIGIN = "https://chuck21619.github.io"
+ALLOWED_ORIGINS = {LIVE_ORIGIN, "http://localhost:8000", "null"}
 GIST_URL = "https://api.github.com/gists/ddd7f0854c1d620f561f1c0f683ab0dc"
 GIST_FILE = "visitor-count.txt"
 
@@ -65,7 +67,7 @@ class CounterHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path != "/visit":
             self.respond(404, {"error": "not found"})
-        elif self.headers.get("Origin") != ALLOWED_ORIGIN:
+        elif self.headers.get("Origin") not in ALLOWED_ORIGINS:
             self.respond(403, {"error": "forbidden"})
         else:
             self.respond_with_count(add_visit)
@@ -80,10 +82,16 @@ class CounterHandler(BaseHTTPRequestHandler):
     def respond(self, status, body):
         data = json.dumps(body).encode()
 
+        origin = self.headers.get("Origin")
+
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
-        self.send_header("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
+        self.send_header(
+            "Access-Control-Allow-Origin",
+            origin if origin in ALLOWED_ORIGINS else LIVE_ORIGIN,
+        )
+        self.send_header("Vary", "Origin")
         self.end_headers()
         self.wfile.write(data)
 

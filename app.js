@@ -15,6 +15,9 @@ const SHORT_TAG_LIST = 30;
 const DEFAULT_TAGS = 10;
 const SAVED_TAGS_KEY = "mtgvenn-selected-tags";
 const SAVED_SECTIONS_KEY = "mtgvenn-open-sections";
+const COUNTED_VISIT_KEY = "mtgvenn-visit-counted";
+
+const COUNTER_URL = "https://mtgvenn-counter.onrender.com";
 const UPSET_MAX_COLUMNS = 20;
 
 const FORCE_HEIGHT = 600;
@@ -1024,4 +1027,46 @@ function setUpSavedSections() {
     }
 }
 
+function wasVisitCounted() {
+
+    // If storage is blocked, assume counted so reloads can't add more visits.
+    try {
+        return localStorage.getItem(COUNTED_VISIT_KEY) !== null;
+    } catch {
+        return true;
+    }
+}
+
+// The counter is extra, so if it fails the number just stays hidden.
+async function showVisitorCount() {
+
+    try {
+
+        const isNewVisit = !wasVisitCounted();
+
+        // keepalive lets the visit finish while the service wakes up,
+        // even if the person leaves the page first.
+        const response = await fetch(
+            `${COUNTER_URL}/${isNewVisit ? "visit" : "count"}`,
+            isNewVisit ? { method: "POST", keepalive: true } : {}
+        );
+
+        if (!response.ok)
+            return;
+
+        const { count } = await response.json();
+
+        if (isNewVisit) {
+            localStorage.setItem(COUNTED_VISIT_KEY, "true");
+        }
+
+        document.getElementById("visitorCount").textContent =
+            `${count.toLocaleString()} ${count === 1 ? "visitor" : "visitors"}`;
+
+    } catch (error) {
+        console.error(error);
+    }
+}
+
 setUpSavedSections();
+showVisitorCount();
