@@ -50,8 +50,8 @@ function parseDeckLine(line) {
     if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("#"))
         return null;
 
-    // "1 Sol Ring", "1x Sol Ring" and "Sol Ring" are all allowed.
-    const match = trimmed.match(/^(\d+x?\s+)?(.+)$/i);
+    // "1 Sol Ring", "1x Sol Ring", "1 x Sol Ring" and "Sol Ring" are all allowed.
+    const match = trimmed.match(/^(\d+\s*x?\s+)?(.+)$/i);
 
     const hasQuantity = Boolean(match[1]);
 
@@ -76,7 +76,18 @@ function parseDeckList(text) {
             .map(parseDeckLine)
             .filter(Boolean);
 
-    return [...new Set(cardNames)];
+    // Keep one of each card, even if its capitalization differs.
+    const uniqueNames = new Map();
+
+    for (const name of cardNames) {
+        const key = name.toLowerCase();
+
+        if (!uniqueNames.has(key)) {
+            uniqueNames.set(key, name);
+        }
+    }
+
+    return [...uniqueNames.values()];
 }
 
 function lookUpCards(cardNames) {
