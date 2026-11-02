@@ -391,12 +391,10 @@ function suggestCards(results) {
 
 function renderSuggestedCards(results) {
 
-    const items = suggestCards(results)
-        .map(name => `<li>${cardNameHtml(name)}</li>`)
-        .join("");
+    const cards = suggestCards(results);
 
     document.getElementById("suggestedCards").innerHTML =
-        items && `<ul>${items}</ul>`;
+        cards.length > 0 ? cardListHtml("Suggested cards", cards) : "";
 }
 
 function selectedTagGroups() {
@@ -454,13 +452,21 @@ function tagCountsSvg(entries) {
     return svg + "</svg>";
 }
 
-function cardListHtml(title, cards) {
+function cardListBoxHtml(titleHtml, countText, rows) {
     return `
         <div class="combo">
-            <strong>${escapeHtml(title)}</strong><br>
-            ${cards.length} card(s)<br><br>
-            ${cards.map(cardNameHtml).join(", ")}
+            <strong>${titleHtml}</strong><br>
+            ${countText}<br><br>
+            ${rows.join("<br>")}
         </div>`;
+}
+
+function cardListHtml(title, cards) {
+    return cardListBoxHtml(
+        escapeHtml(title),
+        `${cards.length} card(s)`,
+        cards.map(cardNameHtml)
+    );
 }
 
 function showTagCards(index) {
@@ -1005,24 +1011,17 @@ function showForceNode(node) {
             }))
             .sort((a, b) => b.shared.length - a.shared.length);
 
-    let html = "";
+    const rows = connections.map(({ name, shared }) =>
+        `${cardNameHtml(name)} (${shared.map(escapeHtml).join(", ")})`
+    );
 
-    if (node) {
-
-        html = `
-        <div class="combo">
-            <strong>${cardNameHtml(node.name)}</strong><br>
-            ${connections.length} connected card(s)<br><br>`;
-
-        for (const { name, shared } of connections) {
-            html += `${cardNameHtml(name)} (${shared.map(escapeHtml).join(", ")})<br>`;
-        }
-
-        html += "</div>";
-    }
-
-    document.getElementById("forceCards").innerHTML =
-        html;
+    document.getElementById("forceCards").innerHTML = node
+        ? cardListBoxHtml(
+            cardNameHtml(node.name),
+            `${connections.length} connected card(s)`,
+            rows
+        )
+        : "";
 }
 
 function renderForceGraph() {
