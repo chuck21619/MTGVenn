@@ -16,7 +16,6 @@ const DEFAULT_TAGS = ["removal", "card-advantage", "ramp", "sweeper"];
 const DISTINCTIVE_TAGS = 4;
 const MIN_DISTINCTIVE_CARDS = 3;
 const NEAR_COPY_SHARE = 0.6;
-const SAVED_TAGS_KEY = "mtgvenn-selected-tags";
 const SAVED_SECTIONS_KEY = "mtgvenn-open-sections";
 const COUNTED_VISIT_KEY = "mtgvenn-visit-counted";
 
@@ -405,38 +404,7 @@ function renderOverlapGroups() {
             : "<p>Pick at least two tags to see overlaps.</p>";
 }
 
-// Storage can be blocked, such as in private windows, so saving is best effort.
-function loadSavedTags() {
-
-    try {
-        return JSON.parse(localStorage.getItem(SAVED_TAGS_KEY)) || [];
-    } catch {
-        return [];
-    }
-}
-
-function saveSelectedTags() {
-
-    const saved = new Set(loadSavedTags());
-
-    // Update only the tags on screen, so choices for other decks are kept.
-    for (const box of document.querySelectorAll("#tagChoices input")) {
-        if (box.checked) {
-            saved.add(box.value);
-        } else {
-            saved.delete(box.value);
-        }
-    }
-
-    try {
-        localStorage.setItem(SAVED_TAGS_KEY, JSON.stringify([...saved]));
-    } catch {
-        // The choices still apply until the page is closed.
-    }
-}
-
 function tagSelectionChanged() {
-    saveSelectedTags();
     renderTagSummary();
     renderTagCharts();
 }
@@ -445,13 +413,8 @@ function renderTagChoices(tagGroups) {
 
     let html = "";
 
-    const saved = loadSavedTags();
-
-    const useSaved =
-        tagGroups.some(([tag]) => saved.includes(tag));
-
     const startingTags =
-        useSaved ? saved : chooseDefaultTags(tagGroups, deckResults.length);
+        chooseDefaultTags(tagGroups, deckResults.length);
 
     tagGroups
         .forEach(([tag, cards]) => {
