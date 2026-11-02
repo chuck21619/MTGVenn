@@ -12,7 +12,10 @@ const SECTION_HEADERS = new Set([
 const MAX_OVERLAP_TAGS = 40;
 
 const SHORT_TAG_LIST = 30;
-const DEFAULT_TAGS = 10;
+const DEFAULT_TAGS = ["removal", "card-advantage", "ramp", "sweeper"];
+const DISTINCTIVE_TAGS = 4;
+const MIN_DISTINCTIVE_CARDS = 3;
+const NEAR_COPY_SHARE = 0.6;
 const SAVED_TAGS_KEY = "mtgvenn-selected-tags";
 const SAVED_SECTIONS_KEY = "mtgvenn-open-sections";
 const COUNTED_VISIT_KEY = "mtgvenn-visit-counted";
@@ -32,6 +35,7 @@ let selectedNode = null;
 let tagCountEntries = [];
 let overlapCells = [];
 let showAllTags = false;
+let allCardTagCounts = null;
 
 function escapeHtml(text) {
     return String(text)
@@ -139,6 +143,82 @@ function groupCardsByTag(results) {
                 b[1].length - a[1].length ||
                 a[0].localeCompare(b[0])
         );
+}
+
+function countAllCardTags() {
+
+    if (allCardTagCounts) {
+        return allCardTagCounts;
+    }
+
+    allCardTagCounts = {};
+
+    for (const positions of Object.values(CARD_TAGS.cards)) {
+        for (const i of positions) {
+            const tag = CARD_TAGS.tags[i];
+            allCardTagCounts[tag] = (allCardTagCounts[tag] || 0) + 1;
+        }
+    }
+
+    return allCardTagCounts;
+}
+
+// Scores how much more common a tag is in the deck than in all of Magic,
+// weighted by card count so a tag on one rare card doesn't win.
+function tagDistinctiveness(tag, cards, deckSize) {
+
+    const deckShare = cards.length / deckSize;
+
+    const allShare =
+        countAllCardTags()[tag] /
+        Object.keys(CARD_TAGS.cards).length;
+
+    return cards.length * Math.log(deckShare / allShare);
+}
+
+// Parent tags and their children often hold nearly the same cards.
+function isNearCopy(cardsA, cardsB) {
+
+    const shared =
+        cardsA.filter(card => cardsB.includes(card)).length;
+
+    // Sharing a card or two says nothing, such as with a tag on only one card.
+    return shared >= MIN_DISTINCTIVE_CARDS &&
+        shared / Math.min(cardsA.length, cardsB.length) >= NEAR_COPY_SHARE;
+}
+
+function chooseDefaultTags(tagGroups, deckSize) {
+
+    const chosen =
+        tagGroups.filter(([tag]) => DEFAULT_TAGS.includes(tag));
+
+    const candidates = tagGroups
+        .filter(([tag, cards]) =>
+            !DEFAULT_TAGS.includes(tag) &&
+            cards.length >= MIN_DISTINCTIVE_CARDS
+        )
+        .map(([tag, cards]) => ({
+            tag,
+            cards,
+            score: tagDistinctiveness(tag, cards, deckSize)
+        }))
+        .sort((a, b) => b.score - a.score);
+
+    let added = 0;
+
+    for (const { tag, cards } of candidates) {
+
+        if (added === DISTINCTIVE_TAGS) {
+            break;
+        }
+
+        if (!chosen.some(([, other]) => isNearCopy(cards, other))) {
+            chosen.push([tag, cards]);
+            added++;
+        }
+    }
+
+    return chosen.map(([tag]) => tag);
 }
 
 function selectedTagGroups() {
@@ -370,11 +450,14 @@ function renderTagChoices(tagGroups) {
     const useSaved =
         tagGroups.some(([tag]) => saved.includes(tag));
 
+    const startingTags =
+        useSaved ? saved : chooseDefaultTags(tagGroups, deckResults.length);
+
     tagGroups
-        .forEach(([tag, cards], i) => {
+        .forEach(([tag, cards]) => {
 
             const isChosen =
-                useSaved ? saved.includes(tag) : i < DEFAULT_TAGS;
+                startingTags.includes(tag);
 
             const checked =
                 isChosen ? "checked" : "";

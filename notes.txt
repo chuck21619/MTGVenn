@@ -15,9 +15,12 @@ project architecture
 					tags is keyed by oracle id
 					so i will lookup card name in cards file to get oracle id, then lookup tags in tags using that id
 			merge files into card_tags.js
+	visitor counter: render service (mtgvenn-counter)
+		code: counter/server.py
+		count stored in a secret github gist (render free tier can't keep files)
+		github token is in render's settings
+		render may need a manual deploy after changing counter/
 
-	
 
 ------------------------
 todo:
-	add counter? i want to see how many people use the site. probly something better to use but i kindof like the idea of an old school site counter
