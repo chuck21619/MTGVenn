@@ -17,6 +17,8 @@ const DISTINCTIVE_TAGS = 4;
 const MIN_DISTINCTIVE_CARDS = 3;
 const NEAR_COPY_SHARE = 0.6;
 const SUGGESTED_CARDS = 5;
+const LOADER_FADE_MS = 200;
+const LOADER_MIN_MS = 500;
 const MAX_FORCE_SHARED_TAGS = 4;
 const CARD_IMAGE_URL = "https://api.scryfall.com/cards/named";
 const PREVIEW_GAP = 16;
@@ -42,6 +44,7 @@ let tagCountEntries = [];
 let overlapCells = [];
 let showAllTags = false;
 let allCardTagCounts = null;
+let isAnalyzing = false;
 let previewedCard = null;
 let lastMouse = null;
 let synergyRanking = [];
@@ -1169,6 +1172,35 @@ function renderProblems(notFound, results) {
 function loadSampleDeck() {
     document.getElementById("deckList").value =
         SAMPLE_DECK_LIST.trim();
+}
+
+function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function analyzeWithLoader() {
+
+    if (isAnalyzing) {
+        return;
+    }
+
+    isAnalyzing = true;
+
+    const loader = document.getElementById("loader");
+
+    loader.classList.add("visible");
+
+    // Analyzing freezes the page, so the fade has to finish first.
+    await wait(LOADER_FADE_MS);
+
+    const started = performance.now();
+
+    analyzeDeck();
+
+    await wait(LOADER_MIN_MS - (performance.now() - started));
+
+    loader.classList.remove("visible");
+    isAnalyzing = false;
 }
 
 function analyzeDeck() {

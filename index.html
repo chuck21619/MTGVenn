@@ -252,6 +252,42 @@
             visibility: visible;
         }
 
+        #loader {
+            position: fixed;
+            inset: 0;
+            z-index: 30;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.6);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 200ms;
+        }
+
+        #loader.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #loader span {
+            display: block;
+            box-sizing: border-box;
+            width: 56px;
+            height: 56px;
+            border: 5px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            will-change: transform;
+            animation: spin 800ms linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
         #cardViewer {
             position: fixed;
             inset: 0;
@@ -430,7 +466,7 @@ Paste a deck export from Archidekt, Moxfield, TappedOut, or any plain text deck 
 
 </details>
 
-<button onclick="analyzeDeck()">
+<button onclick="analyzeWithLoader()">
     Analyze Deck
 </button>
 
@@ -512,6 +548,8 @@ Paste a deck export from Archidekt, Moxfield, TappedOut, or any plain text deck 
     <p>Commander legal cards outside the deck, in its colors, that are mostly about its themes. These come from tags alone, so a card can fit the deck without being a strong card. Lands are left out.</p>
     <div id="suggestedCards"></div>
 </details>
+
+<div id="loader"><span></span></div>
 
 <img id="cardPreview" alt="">
 
