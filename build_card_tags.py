@@ -3,8 +3,14 @@
 Run from the project folder:  python3 build_card_tags.py
 
 Output format, kept small because the browser downloads it:
-    const CARD_TAGS = {"tags": ["ramp", ...], "cards": {"sol ring": [0, 12, ...]}};
+    const CARD_TAGS = {
+        "tags": ["ramp", ...],
+        "cards": {"sol ring": [0, 12, ...]},
+        "suggestable": {"sol ring": ["Sol Ring", "", 0, 1]}
+    };
 Card names are lowercase. Each number is a position in the "tags" list.
+"suggestable" lists the Commander legal cards the site can suggest.
+Each holds [name, color identity, is land (0 or 1), mana value].
 It's a script, not JSON, so the site still works when index.html is opened directly.
 """
 
@@ -50,6 +56,24 @@ def download_bulk_file(bulk_type):
 def get_oracle_id(card):
     # Reversible cards keep their oracle_id on each face.
     return card.get("oracle_id") or card["card_faces"][0]["oracle_id"]
+
+
+def is_suggestable(card):
+    return card["legalities"].get("commander") == "legal"
+
+
+def is_land(card):
+    # Double-faced cards list both faces. Only a land on the front counts.
+    return "Land" in card["type_line"].split("//")[0]
+
+
+def suggestion_details(card):
+    return [
+        card["name"],
+        "".join(card["color_identity"]),
+        int(is_land(card)),
+        card["cmc"],
+    ]
 
 
 def is_ignored(slug):
@@ -99,11 +123,15 @@ def main():
 
     # Cards with no tags stay in the file so the site can tell them from typos.
     tags_for_name = {}
+    suggestable = {}
 
     for card in cards:
         name = card["name"].lower()
         slugs = tags_for_card.get(get_oracle_id(card), set())
         tags_for_name.setdefault(name, set()).update(slugs)
+
+        if is_suggestable(card):
+            suggestable[name] = suggestion_details(card)
 
     tag_names = sorted(set().union(*tags_for_name.values()))
     tag_positions = {slug: i for i, slug in enumerate(tag_names)}
@@ -114,6 +142,7 @@ def main():
             name: sorted(tag_positions[slug] for slug in slugs)
             for name, slugs in tags_for_name.items()
         },
+        "suggestable": suggestable,
     }
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as file:

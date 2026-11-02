@@ -231,6 +231,27 @@
             overflow-x: auto;
         }
 
+        .card-name {
+            cursor: default;
+        }
+
+        .card-name:hover {
+            text-decoration: underline;
+        }
+
+        #cardPreview {
+            position: fixed;
+            z-index: 10;
+            width: 244px;
+            border-radius: 12px;
+            pointer-events: none;
+            visibility: hidden;
+        }
+
+        #cardPreview.visible {
+            visibility: visible;
+        }
+
         #cardSynergy {
             overflow-x: auto;
         }
@@ -466,6 +487,14 @@ Paste a deck export from Archidekt, Moxfield, TappedOut, or any plain text deck 
     <p>Every card in the deck, starting with the ones that connect least to the rest. A low score means few shared themes, not a bad card. The top card scores 100, and basic lands are left out.</p>
     <div id="cardSynergy"></div>
 </details>
+
+<details id="suggestedSection" class="section" open>
+    <summary><h2>Cards That Match Your Themes</h2></summary>
+    <p>Commander legal cards outside the deck, in its colors, that are mostly about its themes. These come from tags alone, so a card can fit the deck without being a strong card. Lands are left out.</p>
+    <div id="suggestedCards"></div>
+</details>
+
+<img id="cardPreview" alt="">
 
 <script src="card_tags.js"></script>
 <script src="sampleDeckList.js"></script>

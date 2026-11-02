@@ -16,6 +16,9 @@ const DEFAULT_TAGS = ["removal", "card-advantage", "ramp"];
 const DISTINCTIVE_TAGS = 4;
 const MIN_DISTINCTIVE_CARDS = 3;
 const NEAR_COPY_SHARE = 0.6;
+const SUGGESTED_CARDS = 5;
+const CARD_IMAGE_URL = "https://api.scryfall.com/cards/named";
+const PREVIEW_GAP = 16;
 const BASIC_LAND =
     /^((snow-covered )?(plains|island|swamp|mountain|forest)|wastes)$/i;
 const SAVED_SECTIONS_KEY = "mtgvenn-open-sections";
@@ -37,6 +40,8 @@ let tagCountEntries = [];
 let overlapCells = [];
 let showAllTags = false;
 let allCardTagCounts = null;
+let previewedCard = null;
+let lastMouse = null;
 let synergyRanking = [];
 
 function escapeHtml(text) {
@@ -45,6 +50,10 @@ function escapeHtml(text) {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
+}
+
+function cardNameHtml(name) {
+    return `<span class="card-name" data-card="${escapeHtml(name)}">${escapeHtml(name)}</span>`;
 }
 
 function setStatus(message, cssClass = "loading") {
@@ -227,12 +236,7 @@ function chooseDefaultTags(tagGroups, deckSize) {
     return chosen.map(([tag]) => tag);
 }
 
-// Each other card counts once, by the rarest tag it shares with this card, so
-// near-copy tags like scry and peek don't count the same connection twice.
-function rankCardsBySynergy(results) {
-
-    const cards =
-        results.filter(card => !BASIC_LAND.test(card.name));
+function deckTagValues(cards) {
 
     const tagValues = {};
 
@@ -242,6 +246,18 @@ function rankCardsBySynergy(results) {
                 Math.max(0, tagRarity(tag, tagCards, cards.length));
         }
     }
+
+    return tagValues;
+}
+
+// Each other card counts once, by the rarest tag it shares with this card, so
+// near-copy tags like scry and peek don't count the same connection twice.
+function rankCardsBySynergy(results) {
+
+    const cards =
+        results.filter(card => !BASIC_LAND.test(card.name));
+
+    const tagValues = deckTagValues(cards);
 
     const ranked = cards.map(card => {
 
@@ -286,7 +302,7 @@ function renderCardSynergy() {
 
             return `
             <tr>
-                <td>${escapeHtml(name)}</td>
+                <td>${cardNameHtml(name)}</td>
                 <td>
                     <div class="score">
                         <span class="score-number">${percent}</span>
@@ -304,6 +320,82 @@ function renderCardSynergy() {
             <tr><th>Card</th><th>Score</th></tr>
             ${rows}
         </table>`;
+}
+
+// Scores cards outside the deck the same way as cards in it, then multiplies by
+// the share of the card's tags that fit, so cards mostly about the deck's themes win.
+function suggestCards(results) {
+
+    const cards =
+        results.filter(card => !BASIC_LAND.test(card.name));
+
+    const tagValues = deckTagValues(cards);
+
+    const deckNames =
+        new Set(results.map(card => card.name.toLowerCase()));
+
+    const deckColors = new Set(
+        cards.flatMap(card => [
+            ...(CARD_TAGS.suggestable[card.name.toLowerCase()]?.[1] || "")
+        ])
+    );
+
+    const scored = [];
+
+    for (const [key, [name, colors, isLand]] of Object.entries(CARD_TAGS.suggestable)) {
+
+        const fitsColors =
+            [...colors].every(color => deckColors.has(color));
+
+        if (isLand || deckNames.has(key) || !fitsColors) {
+            continue;
+        }
+
+        const tags =
+            CARD_TAGS.cards[key].map(i => CARD_TAGS.tags[i]);
+
+        const themeTags =
+            tags.filter(tag => tagValues[tag] > 0);
+
+        if (themeTags.length === 0) {
+            continue;
+        }
+
+        let connection = 0;
+
+        for (const card of cards) {
+
+            const sharedValues = themeTags
+                .filter(tag => card.tags.includes(tag))
+                .map(tag => tagValues[tag]);
+
+            connection += Math.max(0, ...sharedValues);
+        }
+
+        scored.push({
+            name,
+            score: connection * themeTags.length / tags.length
+        });
+    }
+
+    return scored
+        .sort(
+            (a, b) =>
+                b.score - a.score ||
+                a.name.localeCompare(b.name)
+        )
+        .slice(0, SUGGESTED_CARDS)
+        .map(({ name }) => name);
+}
+
+function renderSuggestedCards(results) {
+
+    const items = suggestCards(results)
+        .map(name => `<li>${cardNameHtml(name)}</li>`)
+        .join("");
+
+    document.getElementById("suggestedCards").innerHTML =
+        items && `<ul>${items}</ul>`;
 }
 
 function selectedTagGroups() {
@@ -366,7 +458,7 @@ function cardListHtml(title, cards) {
         <div class="combo">
             <strong>${escapeHtml(title)}</strong><br>
             ${cards.length} card(s)<br><br>
-            ${cards.map(escapeHtml).join(", ")}
+            ${cards.map(cardNameHtml).join(", ")}
         </div>`;
 }
 
@@ -918,11 +1010,11 @@ function showForceNode(node) {
 
         html = `
         <div class="combo">
-            <strong>${escapeHtml(node.name)}</strong><br>
+            <strong>${cardNameHtml(node.name)}</strong><br>
             ${connections.length} connected card(s)<br><br>`;
 
         for (const { name, shared } of connections) {
-            html += `${escapeHtml(name)} (${shared.map(escapeHtml).join(", ")})<br>`;
+            html += `${cardNameHtml(name)} (${shared.map(escapeHtml).join(", ")})<br>`;
         }
 
         html += "</div>";
@@ -970,8 +1062,16 @@ function renderForceGraph() {
     }
 
     canvas.onmousemove = event => {
-        canvas.style.cursor =
-            nodeAt(event.offsetX, event.offsetY) ? "pointer" : "default";
+
+        const node = nodeAt(event.offsetX, event.offsetY);
+
+        canvas.style.cursor = node ? "pointer" : "default";
+
+        if (node) {
+            showCardPreview(node.name);
+        } else {
+            hideCardPreview();
+        }
     };
 
     canvas.onclick = event => {
@@ -1020,7 +1120,7 @@ function renderCardGrid() {
 
     for (const { name, has } of rows) {
 
-        html += `<tr><td class="grid-card">${escapeHtml(name)}</td>`;
+        html += `<tr><td class="grid-card">${cardNameHtml(name)}</td>`;
 
         for (const hasTag of has) {
 
@@ -1058,7 +1158,7 @@ function renderProblems(notFound, results) {
     }
 
     if (untagged.length > 0) {
-        html += `<p>No tags yet: ${untagged.map(escapeHtml).join(", ")}</p>`;
+        html += `<p>No tags yet: ${untagged.map(cardNameHtml).join(", ")}</p>`;
     }
 
     document.getElementById("problems").innerHTML =
@@ -1076,6 +1176,7 @@ function analyzeDeck() {
 
         document.getElementById("problems").innerHTML = "";
         document.getElementById("cardSynergy").innerHTML = "";
+        document.getElementById("suggestedCards").innerHTML = "";
         document.getElementById("tagChoices").innerHTML = "";
         document.getElementById("upsetPlot").innerHTML = "";
         document.getElementById("upsetCards").innerHTML = "";
@@ -1112,6 +1213,7 @@ function analyzeDeck() {
         synergyRanking = rankCardsBySynergy(results);
 
         renderCardSynergy();
+        renderSuggestedCards(results);
         renderTagChoices(tagGroups);
         renderTagCharts();
 
@@ -1132,6 +1234,86 @@ function analyzeDeck() {
 }
 
 // The deck list has no id, so it always loads expanded.
+function moveCardPreview(event) {
+
+    const preview = document.getElementById("cardPreview");
+
+    const fitsOnRight =
+        event.clientX + PREVIEW_GAP + preview.offsetWidth < window.innerWidth;
+
+    const left = fitsOnRight
+        ? event.clientX + PREVIEW_GAP
+        : event.clientX - PREVIEW_GAP - preview.offsetWidth;
+
+    const top = Math.min(
+        event.clientY + PREVIEW_GAP,
+        window.innerHeight - preview.offsetHeight - PREVIEW_GAP
+    );
+
+    preview.style.left = `${Math.max(PREVIEW_GAP, left)}px`;
+    preview.style.top = `${Math.max(PREVIEW_GAP, top)}px`;
+}
+
+function showCardPreview(name) {
+
+    if (name === previewedCard) {
+        return;
+    }
+
+    previewedCard = name;
+
+    document.getElementById("cardPreview").src =
+        `${CARD_IMAGE_URL}?exact=${encodeURIComponent(name)}` +
+        "&format=image&version=normal";
+}
+
+function hideCardPreview() {
+
+    const preview = document.getElementById("cardPreview");
+
+    previewedCard = null;
+    preview.classList.remove("visible");
+    preview.removeAttribute("src");
+}
+
+function setUpCardPreview() {
+
+    const preview = document.getElementById("cardPreview");
+
+    // Stays hidden until loaded, so the last card never flashes up first.
+    preview.addEventListener("load", () => {
+        preview.classList.add("visible");
+        moveCardPreview(lastMouse);
+    });
+
+    document.addEventListener("mouseover", event => {
+
+        const card = event.target.closest(".card-name");
+
+        if (card) {
+            lastMouse = event;
+            showCardPreview(card.dataset.card);
+        }
+    });
+
+    document.addEventListener("mouseout", event => {
+        if (event.target.closest(".card-name")) {
+            hideCardPreview();
+        }
+    });
+
+    document.getElementById("forceCanvas")
+        .addEventListener("mouseleave", hideCardPreview);
+
+    document.addEventListener("mousemove", event => {
+        lastMouse = event;
+
+        if (preview.classList.contains("visible")) {
+            moveCardPreview(event);
+        }
+    });
+}
+
 function setUpSavedSections() {
 
     let saved = {};
@@ -1205,4 +1387,5 @@ async function showVisitorCount() {
 }
 
 setUpSavedSections();
+setUpCardPreview();
 showVisitorCount();
