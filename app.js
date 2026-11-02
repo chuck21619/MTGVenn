@@ -188,7 +188,13 @@ function findOverlapGroups(tagGroups) {
         .slice(0, MAX_OVERLAP_GROUPS);
 }
 
-function renderOverlapGroups(tagGroups) {
+function renderOverlapGroups() {
+
+    const tags = selectedTags();
+
+    const tagGroups =
+        groupCardsByTag(deckResults)
+            .filter(([tag]) => tags.includes(tag));
 
     let html = "";
 
@@ -680,6 +686,7 @@ function renderForceGraph() {
 function renderTagCharts() {
     renderUpsetPlot();
     renderForceGraph();
+    renderOverlapGroups();
 }
 
 function renderProblems(notFound, results) {
@@ -748,7 +755,6 @@ function analyzeDeck() {
         renderTagChoices(tagGroups);
         renderTagCharts();
         renderTagCounts(tagGroups);
-        renderOverlapGroups(tagGroups);
 
         setStatus(
             `Finished analyzing ${results.length} cards.`,
