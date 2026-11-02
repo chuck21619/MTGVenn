@@ -1061,7 +1061,7 @@ async function showVisitorCount() {
         }
 
         document.getElementById("visitorCount").textContent =
-            `${count.toLocaleString()} ${count === 1 ? "visitor" : "visitors"}`;
+            count.toLocaleString();
 
     } catch (error) {
         console.error(error);
