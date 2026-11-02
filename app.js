@@ -9,7 +9,7 @@ const SECTION_HEADERS = new Set([
     "sideboard"
 ]);
 
-const MAX_OVERLAP_GROUPS = 25;
+const MAX_OVERLAP_TAGS = 40;
 
 const SHORT_TAG_LIST = 30;
 const DEFAULT_TAGS = 10;
@@ -25,9 +25,9 @@ let deckResults = [];
 let upsetIntersections = [];
 let forceNodes = [];
 let forceLinks = [];
-let hoveredNode = null;
 let selectedNode = null;
 let tagCountEntries = [];
+let overlapCells = [];
 let showAllTags = false;
 
 function escapeHtml(text) {
@@ -171,7 +171,7 @@ function tagCountsSvg(entries) {
         const barTop = scaleY(cards.length);
 
         svg += `
-        <g class="count-column" onmousemove="showTagCards(event, ${i})" onclick="showTagCards(event, ${i})" onmouseleave="hideTagCards()">
+        <g class="count-column" onclick="showTagCards(${i})">
             <rect class="count-hit" x="${x}" y="${top}" width="${columnWidth}" height="${plotHeight}"></rect>
             <rect class="count-bar" x="${x + 6}" y="${barTop}" width="${columnWidth - 12}" height="${baseline - barTop}"></rect>
             <text class="count-text" x="${center}" y="${barTop - 5}" text-anchor="middle">${cards.length}</text>
@@ -182,96 +182,133 @@ function tagCountsSvg(entries) {
     return svg + "</svg>";
 }
 
-function showTagCards(event, index) {
+function cardListHtml(title, cards) {
+    return `
+        <div class="combo">
+            <strong>${escapeHtml(title)}</strong><br>
+            ${cards.length} card(s)<br><br>
+            ${cards.map(escapeHtml).join(", ")}
+        </div>`;
+}
+
+function showTagCards(index) {
 
     const [tag, cards] = tagCountEntries[index];
 
-    const tooltip = document.getElementById("tagCardsTooltip");
-
-    tooltip.innerHTML = `
-        <strong>${escapeHtml(tag)}</strong> (${cards.length})<br>
-        ${cards.map(escapeHtml).join(", ")}`;
-
-    tooltip.style.display = "block";
-
-    // Keep the box on screen when the pointer is near an edge.
-    const x = Math.min(event.clientX + 14, window.innerWidth - tooltip.offsetWidth - 8);
-    const y = Math.min(event.clientY + 14, window.innerHeight - tooltip.offsetHeight - 8);
-
-    tooltip.style.left = `${Math.max(x, 8)}px`;
-    tooltip.style.top = `${Math.max(y, 8)}px`;
+    document.getElementById("tagCountCards").innerHTML =
+        cardListHtml(tag, cards);
 }
 
-function hideTagCards() {
-    document.getElementById("tagCardsTooltip").style.display = "none";
+function showOverlapCards(index) {
+
+    const { title, cards } = overlapCells[index];
+
+    document.getElementById("overlapCards").innerHTML =
+        cardListHtml(title, cards);
 }
 
 function renderTagCounts() {
 
     tagCountEntries = selectedTagGroups();
 
-    hideTagCards();
+    document.getElementById("tagCountCards").innerHTML = "";
 
     document.getElementById("tagCounts").innerHTML =
         tagCountEntries.length > 0 ? tagCountsSvg(tagCountEntries) : "";
 }
 
-function findOverlapGroups(tagGroups) {
+function findOverlapCells(tagGroups) {
 
-    const shared =
-        tagGroups.filter(([, cards]) => cards.length > 1);
+    const cells = [];
 
-    const groups = new Map();
+    tagGroups.forEach(([tagA, cardsA], row) => {
+        tagGroups.slice(0, row).forEach(([tagB, cardsB], column) => {
 
-    for (let i = 0; i < shared.length; i++) {
-        for (let j = i + 1; j < shared.length; j++) {
-
-            const [tagA, cardsA] = shared[i];
-            const [tagB, cardsB] = shared[j];
-
-            const overlap =
+            const cards =
                 cardsA.filter(name => cardsB.includes(name));
 
-            // If every card with one tag has the other, the pair says nothing new.
-            if (
-                overlap.length < 2 ||
-                overlap.length === cardsA.length ||
-                overlap.length === cardsB.length
-            )
-                continue;
-
-            const key = overlap.join("|");
-
-            if (!groups.has(key)) {
-                groups.set(key, {
-                    combo: `${tagA} + ${tagB}`,
-                    cards: overlap
+            if (cards.length > 0) {
+                cells.push({
+                    row,
+                    column,
+                    title: `${tagB} + ${tagA}`,
+                    cards
                 });
             }
-        }
-    }
+        });
+    });
 
-    return [...groups.values()]
-        .sort((a, b) => b.cards.length - a.cards.length)
-        .slice(0, MAX_OVERLAP_GROUPS);
+    return cells;
+}
+
+function overlapSvg(tags, cells) {
+
+    const left = 190;
+    const top = 5;
+    const bottom = 130;
+    const cellSize = 32;
+
+    const size = (tags.length - 1) * cellSize;
+    const baseline = top + size;
+    const width = left + size + 20;
+    const height = baseline + bottom;
+
+    const mostCards =
+        Math.max(...cells.map(cell => cell.cards.length), 1);
+
+    let svg = `<svg width="${width}" height="${height}" role="img" aria-label="Heatmap of cards shared between tags">`;
+
+    // The first tag has no row and the last has no column, so the grid is a triangle.
+    tags.slice(1).forEach((tag, i) => {
+        svg += `
+        <text class="count-text" x="${left - 8}" y="${top + i * cellSize + cellSize / 2 + 4}" text-anchor="end">${escapeHtml(tag)}</text>`;
+
+        for (let column = 0; column <= i; column++) {
+            svg += `<rect class="overlap-empty" x="${left + column * cellSize + 1}" y="${top + i * cellSize + 1}" width="${cellSize - 2}" height="${cellSize - 2}"></rect>`;
+        }
+    });
+
+    tags.slice(0, -1).forEach((tag, i) => {
+
+        const x = left + i * cellSize + cellSize / 2 + 3;
+
+        svg += `<text class="count-text" x="${x}" y="${baseline + 14}" text-anchor="end" transform="rotate(-45 ${x} ${baseline + 14})">${escapeHtml(tag)}</text>`;
+    });
+
+    cells.forEach(({ row, column, cards }, i) => {
+
+        const x = left + column * cellSize;
+        const y = top + (row - 1) * cellSize;
+        const strength = cards.length / mostCards;
+
+        const textClass =
+            strength > 0.55 ? "overlap-text-dark" : "count-text";
+
+        svg += `
+        <g class="overlap-cell" onclick="showOverlapCards(${i})">
+            <rect x="${x + 1}" y="${y + 1}" width="${cellSize - 2}" height="${cellSize - 2}" fill-opacity="${0.15 + 0.85 * strength}"></rect>
+            <text class="${textClass}" x="${x + cellSize / 2}" y="${y + cellSize / 2 + 4}" text-anchor="middle">${cards.length}</text>
+        </g>`;
+    });
+
+    return svg + "</svg>";
 }
 
 function renderOverlapGroups() {
 
-    let html = "";
+    const tagGroups =
+        selectedTagGroups().slice(0, MAX_OVERLAP_TAGS);
 
-    for (const { combo, cards } of findOverlapGroups(selectedTagGroups())) {
+    const tags = tagGroups.map(([tag]) => tag);
 
-        html += `
-        <div class="combo">
-            <strong>${escapeHtml(combo)}</strong><br>
-            ${cards.length} card(s)<br><br>
-            ${cards.map(escapeHtml).join(", ")}
-        </div>`;
-    }
+    overlapCells = findOverlapCells(tagGroups);
+
+    document.getElementById("overlapCards").innerHTML = "";
 
     document.getElementById("overlaps").innerHTML =
-        html;
+        tags.length > 1
+            ? overlapSvg(tags, overlapCells)
+            : "<p>Pick at least two tags to see overlaps.</p>";
 }
 
 // Storage can be blocked, such as in private windows, so saving is best effort.
@@ -501,9 +538,7 @@ function upsetSvg(tags, intersections) {
         }
 
         svg += `
-        <rect class="upset-hit" x="${x - columnWidth / 2}" y="0" width="${columnWidth}" height="${height}" onclick="showIntersection(${i})">
-            <title>${group.tags.map(escapeHtml).join(" + ")}: ${group.cards.length} card(s)</title>
-        </rect>`;
+        <rect class="upset-hit" x="${x - columnWidth / 2}" y="0" width="${columnWidth}" height="${height}" onclick="showIntersection(${i})"></rect>`;
     });
 
     return svg + "</svg>";
@@ -513,12 +548,8 @@ function showIntersection(index) {
 
     const { tags, cards } = upsetIntersections[index];
 
-    document.getElementById("upsetCards").innerHTML = `
-        <div class="combo">
-            <strong>Only ${tags.map(escapeHtml).join(" + ")}</strong><br>
-            ${cards.length} card(s)<br><br>
-            ${cards.map(escapeHtml).join(", ")}
-        </div>`;
+    document.getElementById("upsetCards").innerHTML =
+        cardListHtml(`Only ${tags.join(" + ")}`, cards);
 }
 
 function renderUpsetPlot() {
@@ -663,7 +694,7 @@ function drawForceGraph() {
     const muted = style.getPropertyValue("--border");
     const text = style.getPropertyValue("--text");
 
-    const active = hoveredNode || selectedNode;
+    const active = selectedNode;
 
     const isActiveLink =
         link => link.a === active || link.b === active;
@@ -773,8 +804,6 @@ function renderForceGraph() {
 
     forceNodes = nodes;
     forceLinks = links;
-    hoveredNode = null;
-
     showForceNode(null);
 
     canvas.width = width * scale;
@@ -787,14 +816,8 @@ function renderForceGraph() {
     }
 
     canvas.onmousemove = event => {
-        hoveredNode = nodeAt(event.offsetX, event.offsetY);
-        canvas.style.cursor = hoveredNode ? "pointer" : "default";
-        drawForceGraph();
-    };
-
-    canvas.onmouseleave = () => {
-        hoveredNode = null;
-        drawForceGraph();
+        canvas.style.cursor =
+            nodeAt(event.offsetX, event.offsetY) ? "pointer" : "default";
     };
 
     canvas.onclick = event => {
@@ -845,13 +868,13 @@ function renderCardGrid() {
 
         html += `<tr><td class="grid-card">${escapeHtml(name)}</td>`;
 
-        has.forEach((hasTag, i) => {
+        for (const hasTag of has) {
 
             const cssClass =
                 hasTag ? "grid-on" : "grid-off";
 
-            html += `<td class="${cssClass}" title="${escapeHtml(name)}: ${escapeHtml(tags[i])}"></td>`;
-        });
+            html += `<td class="${cssClass}"></td>`;
+        }
 
         html += "</tr>";
     }

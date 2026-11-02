@@ -244,17 +244,25 @@
             fill: var(--surface);
         }
 
-        #tagCardsTooltip {
-            display: none;
-            position: fixed;
-            z-index: 1;
-            max-width: 380px;
-            padding: 10px;
-            font-size: 13px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 5px;
-            pointer-events: none;
+        #overlaps {
+            overflow-x: auto;
+        }
+
+        .overlap-empty {
+            fill: var(--surface);
+        }
+
+        .overlap-cell rect {
+            fill: var(--accent);
+        }
+
+        .overlap-cell:hover rect {
+            stroke: var(--text);
+        }
+
+        .overlap-text-dark {
+            fill: var(--bg);
+            font-size: 12px;
         }
 
         .loading {
@@ -297,6 +305,7 @@ Paste a deck export from Archidekt, Moxfield, TappedOut, or any plain text deck 
 
 <details id="tagsSection" class="section" open>
     <summary><h2>Tags to Show</h2></summary>
+    <p>Choose which tags the charts below use. The number is how many cards in the deck have that tag.</p>
     <div id="tagControls" hidden>
         <input
             id="tagSearch"
@@ -312,12 +321,14 @@ Paste a deck export from Archidekt, Moxfield, TappedOut, or any plain text deck 
 
 <details id="upsetSection" class="section" open>
     <summary><h2>UpSet Plot</h2></summary>
+    <p>Each column is one exact combination of tags, and its bar shows how many cards have only that combination. Click a column to list its cards below.</p>
     <div id="upsetPlot"></div>
     <div id="upsetCards"></div>
 </details>
 
 <details id="forceSection" class="section" open ontoggle="if (this.open) renderForceGraph()">
     <summary><h2>Force Graph</h2></summary>
+    <p>Each dot is a card, and lines join cards that share tags. Bigger dots have more connections. Click a dot to highlight its connections and list them below.</p>
     <label>
         Connect cards sharing at least
         <input
@@ -340,17 +351,19 @@ Paste a deck export from Archidekt, Moxfield, TappedOut, or any plain text deck 
     <div id="cardGrid"></div>
 </details>
 
-<details id="overlapSection" class="section">
-    <summary><h2>Tag Overlap Groups</h2></summary>
+<details id="overlapSection" class="section" open>
+    <summary><h2>Tag Overlaps</h2></summary>
+    <p>Each square shows how many cards have both tags. Click a square to list its cards below. Showing up to the 40 most common selected tags.</p>
     <div id="overlaps"></div>
+    <div id="overlapCards"></div>
 </details>
 
 <details id="countsSection" class="section" open>
     <summary><h2>Tag Counts</h2></summary>
+    <p>How many cards have each selected tag. Click a bar to list its cards below.</p>
     <div id="tagCounts"></div>
+    <div id="tagCountCards"></div>
 </details>
-
-<div id="tagCardsTooltip"></div>
 
 <script src="card_tags.js"></script>
 <script src="sampleDeckList.js"></script>
