@@ -138,8 +138,49 @@
             margin-top: 10px;
         }
 
+        #forceMinSharedControl {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+        }
+
         #forceMinShared {
-            width: 50px;
+            -webkit-appearance: none;
+            appearance: none;
+            width: 200px;
+            height: 20px;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        #forceMinShared::-webkit-slider-runnable-track {
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        #forceMinShared::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            margin-top: -6px;
+            background: var(--accent);
+            border-radius: 50%;
+        }
+
+        #forceMinShared::-moz-range-track {
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        #forceMinShared::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: var(--accent);
+            border: none;
+            border-radius: 50%;
         }
 
         #forceCanvas {
@@ -343,15 +384,16 @@ Paste a deck export from Archidekt, Moxfield, TappedOut, or any plain text deck 
 <details id="forceSection" class="section" open ontoggle="if (this.open) renderForceGraph()">
     <summary><h2>Force Graph</h2></summary>
     <p>Each dot is a card, and lines join cards that share tags. Bigger dots have more connections. Click a dot to highlight its connections and list them below.</p>
-    <label>
+    <label id="forceMinSharedControl">
         Connect cards sharing at least
         <input
             id="forceMinShared"
-            type="number"
+            type="range"
             min="1"
+            max="10"
             value="2"
-            onchange="renderForceGraph()">
-        selected tags
+            oninput="renderForceGraph()">
+        <strong id="forceMinSharedLabel">2 tags</strong>
     </label>
     <div id="forceGraph">
         <canvas id="forceCanvas" height="0"></canvas>

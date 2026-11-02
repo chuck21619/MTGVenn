@@ -796,11 +796,19 @@ function renderForceGraph() {
         return;
     const scale = window.devicePixelRatio || 1;
 
-    const minShared =
-        Number(document.getElementById("forceMinShared").value) || 1;
+    const tags = selectedTags();
+
+    const slider = document.getElementById("forceMinShared");
+
+    slider.max = Math.max(tags.length, 1);
+
+    const minShared = Number(slider.value);
+
+    document.getElementById("forceMinSharedLabel").textContent =
+        minShared === 1 ? "1 tag" : `${minShared} tags`;
 
     const { nodes, links } =
-        buildForceGraph(deckResults, selectedTags(), minShared);
+        buildForceGraph(deckResults, tags, minShared);
 
     forceNodes = nodes;
     forceLinks = links;
