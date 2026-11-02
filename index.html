@@ -319,6 +319,20 @@ Paste a deck export from Archidekt, Moxfield, TappedOut, or any plain text deck 
     <div id="tagChoices"></div>
 </details>
 
+<details id="countsSection" class="section" open>
+    <summary><h2>Tag Counts</h2></summary>
+    <p>How many cards have each selected tag. Click a bar to list its cards below.</p>
+    <div id="tagCounts"></div>
+    <div id="tagCountCards"></div>
+</details>
+
+<details id="overlapSection" class="section" open>
+    <summary><h2>Tag Overlaps</h2></summary>
+    <p>Each square shows how many cards have both tags. Click a square to list its cards below. Showing up to the 40 most common selected tags.</p>
+    <div id="overlaps"></div>
+    <div id="overlapCards"></div>
+</details>
+
 <details id="upsetSection" class="section" open>
     <summary><h2>UpSet Plot</h2></summary>
     <p>Each column is one exact combination of tags, and its bar shows how many cards have only that combination. Click a column to list its cards below.</p>
@@ -349,20 +363,6 @@ Paste a deck export from Archidekt, Moxfield, TappedOut, or any plain text deck 
     <summary><h2>Card Grid</h2></summary>
     <p>Rows are cards and columns are tags. Rows with few squares may not fit the deck.</p>
     <div id="cardGrid"></div>
-</details>
-
-<details id="overlapSection" class="section" open>
-    <summary><h2>Tag Overlaps</h2></summary>
-    <p>Each square shows how many cards have both tags. Click a square to list its cards below. Showing up to the 40 most common selected tags.</p>
-    <div id="overlaps"></div>
-    <div id="overlapCards"></div>
-</details>
-
-<details id="countsSection" class="section" open>
-    <summary><h2>Tag Counts</h2></summary>
-    <p>How many cards have each selected tag. Click a bar to list its cards below.</p>
-    <div id="tagCounts"></div>
-    <div id="tagCountCards"></div>
 </details>
 
 <script src="card_tags.js"></script>
