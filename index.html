@@ -252,6 +252,25 @@
             visibility: visible;
         }
 
+        #cardViewer {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        #cardViewer[hidden] {
+            display: none;
+        }
+
+        #cardViewerImage {
+            width: min(90vw, 64vh, 400px);
+            border-radius: 16px;
+        }
+
         #cardSynergy {
             overflow-x: auto;
         }
@@ -495,6 +514,10 @@ Paste a deck export from Archidekt, Moxfield, TappedOut, or any plain text deck 
 </details>
 
 <img id="cardPreview" alt="">
+
+<div id="cardViewer" hidden>
+    <img id="cardViewerImage" alt="">
+</div>
 
 <script src="card_tags.js"></script>
 <script src="sampleDeckList.js"></script>

@@ -19,6 +19,7 @@ const NEAR_COPY_SHARE = 0.6;
 const SUGGESTED_CARDS = 5;
 const CARD_IMAGE_URL = "https://api.scryfall.com/cards/named";
 const PREVIEW_GAP = 16;
+const TOUCH_SCREEN = window.matchMedia("(hover: none)").matches;
 const BASIC_LAND =
     /^((snow-covered )?(plains|island|swamp|mountain|forest)|wastes)$/i;
 const SAVED_SECTIONS_KEY = "mtgvenn-open-sections";
@@ -1254,17 +1255,21 @@ function moveCardPreview(event) {
     preview.style.top = `${Math.max(PREVIEW_GAP, top)}px`;
 }
 
+function cardImageUrl(name) {
+    return `${CARD_IMAGE_URL}?exact=${encodeURIComponent(name)}` +
+        "&format=image&version=normal";
+}
+
 function showCardPreview(name) {
 
-    if (name === previewedCard) {
+    // Touch screens send a fake hover with each tap, and use the viewer instead.
+    if (TOUCH_SCREEN || name === previewedCard) {
         return;
     }
 
     previewedCard = name;
 
-    document.getElementById("cardPreview").src =
-        `${CARD_IMAGE_URL}?exact=${encodeURIComponent(name)}` +
-        "&format=image&version=normal";
+    document.getElementById("cardPreview").src = cardImageUrl(name);
 }
 
 function hideCardPreview() {
@@ -1274,6 +1279,27 @@ function hideCardPreview() {
     previewedCard = null;
     preview.classList.remove("visible");
     preview.removeAttribute("src");
+}
+
+function setUpCardViewer() {
+
+    const viewer = document.getElementById("cardViewer");
+    const image = document.getElementById("cardViewerImage");
+
+    document.addEventListener("click", event => {
+
+        const card = event.target.closest(".card-name");
+
+        if (TOUCH_SCREEN && card) {
+            image.src = cardImageUrl(card.dataset.card);
+            viewer.hidden = false;
+        }
+    });
+
+    viewer.addEventListener("click", () => {
+        viewer.hidden = true;
+        image.removeAttribute("src");
+    });
 }
 
 function setUpCardPreview() {
@@ -1388,4 +1414,5 @@ async function showVisitorCount() {
 
 setUpSavedSections();
 setUpCardPreview();
+setUpCardViewer();
 showVisitorCount();
