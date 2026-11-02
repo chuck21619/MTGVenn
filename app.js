@@ -17,6 +17,7 @@ const DISTINCTIVE_TAGS = 4;
 const MIN_DISTINCTIVE_CARDS = 3;
 const NEAR_COPY_SHARE = 0.6;
 const SUGGESTED_CARDS = 5;
+const MAX_FORCE_SHARED_TAGS = 4;
 const CARD_IMAGE_URL = "https://api.scryfall.com/cards/named";
 const PREVIEW_GAP = 16;
 const TOUCH_SCREEN = window.matchMedia("(hover: none)").matches;
@@ -1038,7 +1039,7 @@ function renderForceGraph() {
 
     const slider = document.getElementById("forceMinShared");
 
-    slider.max = Math.max(tags.length, 1);
+    slider.max = Math.min(Math.max(tags.length, 1), MAX_FORCE_SHARED_TAGS);
 
     const minShared = Number(slider.value);
 
