@@ -13,6 +13,7 @@ const MAX_OVERLAP_GROUPS = 25;
 
 const TAG_CHOICES = 30;
 const DEFAULT_TAGS = 10;
+const SAVED_TAGS_KEY = "mtgvenn-selected-tags";
 const UPSET_MAX_COLUMNS = 20;
 
 const FORCE_HEIGHT = 600;
@@ -205,16 +206,61 @@ function renderOverlapGroups(tagGroups) {
         html;
 }
 
+// Storage can be blocked, such as in private windows, so saving is best effort.
+function loadSavedTags() {
+
+    try {
+        return JSON.parse(localStorage.getItem(SAVED_TAGS_KEY)) || [];
+    } catch {
+        return [];
+    }
+}
+
+function saveSelectedTags() {
+
+    const saved = new Set(loadSavedTags());
+
+    // Update only the tags on screen, so choices for other decks are kept.
+    for (const box of document.querySelectorAll("#tagChoices input")) {
+        if (box.checked) {
+            saved.add(box.value);
+        } else {
+            saved.delete(box.value);
+        }
+    }
+
+    try {
+        localStorage.setItem(SAVED_TAGS_KEY, JSON.stringify([...saved]));
+    } catch {
+        // The choices still apply until the page is closed.
+    }
+}
+
+function tagSelectionChanged() {
+    saveSelectedTags();
+    renderTagCharts();
+}
+
 function renderTagChoices(tagGroups) {
 
     let html = "";
 
-    tagGroups
-        .slice(0, TAG_CHOICES)
+    const choices =
+        tagGroups.slice(0, TAG_CHOICES);
+
+    const saved = loadSavedTags();
+
+    const useSaved =
+        choices.some(([tag]) => saved.includes(tag));
+
+    choices
         .forEach(([tag, cards], i) => {
 
+            const isChosen =
+                useSaved ? saved.includes(tag) : i < DEFAULT_TAGS;
+
             const checked =
-                i < DEFAULT_TAGS ? "checked" : "";
+                isChosen ? "checked" : "";
 
             html += `
             <label>
@@ -222,7 +268,7 @@ function renderTagChoices(tagGroups) {
                     type="checkbox"
                     value="${escapeHtml(tag)}"
                     ${checked}
-                    onchange="renderTagCharts()">
+                    onchange="tagSelectionChanged()">
                 ${escapeHtml(tag)} (${cards.length})
             </label>`;
         });

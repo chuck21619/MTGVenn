@@ -25,3 +25,4 @@ todo:
 	fix deck list parsing (i think '1x forest' doesnt work but '1 forest' does)
 	add imports via links from archidekt and moxfield
 	add default tags to show? then a dropdown to show lesser used tags
+	save tag selections per user - is there a way to save per deck?
