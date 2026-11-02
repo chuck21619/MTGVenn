@@ -11,11 +11,13 @@ const SECTION_HEADERS = new Set([
 
 const MAX_OVERLAP_TAGS = 40;
 
-const SHORT_TAG_LIST = 30;
-const DEFAULT_TAGS = ["removal", "card-advantage", "ramp", "sweeper"];
+const SHORT_TAG_LIST = 15;
+const DEFAULT_TAGS = ["removal", "card-advantage", "ramp"];
 const DISTINCTIVE_TAGS = 4;
 const MIN_DISTINCTIVE_CARDS = 3;
 const NEAR_COPY_SHARE = 0.6;
+const BASIC_LAND =
+    /^((snow-covered )?(plains|island|swamp|mountain|forest)|wastes)$/i;
 const SAVED_SECTIONS_KEY = "mtgvenn-open-sections";
 const COUNTED_VISIT_KEY = "mtgvenn-visit-counted";
 
@@ -35,6 +37,7 @@ let tagCountEntries = [];
 let overlapCells = [];
 let showAllTags = false;
 let allCardTagCounts = null;
+let synergyRanking = [];
 
 function escapeHtml(text) {
     return String(text)
@@ -162,9 +165,8 @@ function countAllCardTags() {
     return allCardTagCounts;
 }
 
-// Scores how much more common a tag is in the deck than in all of Magic,
-// weighted by card count so a tag on one rare card doesn't win.
-function tagDistinctiveness(tag, cards, deckSize) {
+// Above zero when a tag is more common in the deck than in all of Magic.
+function tagRarity(tag, cards, deckSize) {
 
     const deckShare = cards.length / deckSize;
 
@@ -172,7 +174,12 @@ function tagDistinctiveness(tag, cards, deckSize) {
         countAllCardTags()[tag] /
         Object.keys(CARD_TAGS.cards).length;
 
-    return cards.length * Math.log(deckShare / allShare);
+    return Math.log(deckShare / allShare);
+}
+
+// Weighted by card count so a tag on one rare card doesn't win.
+function tagDistinctiveness(tag, cards, deckSize) {
+    return cards.length * tagRarity(tag, cards, deckSize);
 }
 
 // Parent tags and their children often hold nearly the same cards.
@@ -218,6 +225,85 @@ function chooseDefaultTags(tagGroups, deckSize) {
     }
 
     return chosen.map(([tag]) => tag);
+}
+
+// Each other card counts once, by the rarest tag it shares with this card, so
+// near-copy tags like scry and peek don't count the same connection twice.
+function rankCardsBySynergy(results) {
+
+    const cards =
+        results.filter(card => !BASIC_LAND.test(card.name));
+
+    const tagValues = {};
+
+    for (const [tag, tagCards] of groupCardsByTag(cards)) {
+        if (tagCards.length >= MIN_DISTINCTIVE_CARDS) {
+            tagValues[tag] =
+                Math.max(0, tagRarity(tag, tagCards, cards.length));
+        }
+    }
+
+    const ranked = cards.map(card => {
+
+        let score = 0;
+
+        for (const other of cards) {
+
+            if (other === card) {
+                continue;
+            }
+
+            const sharedValues = card.tags
+                .filter(tag => other.tags.includes(tag))
+                .map(tag => tagValues[tag] || 0);
+
+            score += Math.max(0, ...sharedValues);
+        }
+
+        return { name: card.name, score };
+    });
+
+    return ranked.sort(
+        (a, b) =>
+            a.score - b.score ||
+            a.name.localeCompare(b.name)
+    );
+}
+
+function renderCardSynergy() {
+
+    if (synergyRanking.length === 0) {
+        return;
+    }
+
+    const topScore =
+        synergyRanking.at(-1)?.score || 1;
+
+    const rows = synergyRanking
+        .map(({ name, score }) => {
+
+            const percent = Math.round(score / topScore * 100);
+
+            return `
+            <tr>
+                <td>${escapeHtml(name)}</td>
+                <td>
+                    <div class="score">
+                        <span class="score-number">${percent}</span>
+                        <span class="score-track">
+                            <span class="score-bar" style="width: ${percent}%"></span>
+                        </span>
+                    </div>
+                </td>
+            </tr>`;
+        })
+        .join("");
+
+    document.getElementById("cardSynergy").innerHTML = `
+        <table>
+            <tr><th>Card</th><th>Score</th></tr>
+            ${rows}
+        </table>`;
 }
 
 function selectedTagGroups() {
@@ -989,6 +1075,7 @@ function analyzeDeck() {
     try {
 
         document.getElementById("problems").innerHTML = "";
+        document.getElementById("cardSynergy").innerHTML = "";
         document.getElementById("tagChoices").innerHTML = "";
         document.getElementById("upsetPlot").innerHTML = "";
         document.getElementById("upsetCards").innerHTML = "";
@@ -1022,6 +1109,9 @@ function analyzeDeck() {
         deckResults = results;
 
         renderProblems(notFound, results);
+        synergyRanking = rankCardsBySynergy(results);
+
+        renderCardSynergy();
         renderTagChoices(tagGroups);
         renderTagCharts();
 

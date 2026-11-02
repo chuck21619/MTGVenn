@@ -231,6 +231,34 @@
             overflow-x: auto;
         }
 
+        #cardSynergy td:first-child {
+            width: 35%;
+        }
+
+        .score {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .score-number {
+            flex: none;
+            width: 2.2em;
+            text-align: right;
+        }
+
+        .score-track {
+            flex: 1;
+        }
+
+        .score-bar {
+            display: block;
+            min-width: 2px;
+            height: 10px;
+            border-radius: 0 2px 2px 0;
+            background: var(--accent);
+        }
+
         #cardGrid table {
             width: auto;
             border-collapse: separate;
@@ -416,6 +444,12 @@ Paste a deck export from Archidekt, Moxfield, TappedOut, or any plain text deck 
     <summary><h2>Card Grid</h2></summary>
     <p>Rows are cards and columns are tags. Rows with few squares may not fit the deck.</p>
     <div id="cardGrid"></div>
+</details>
+
+<details id="synergySection" class="section" open>
+    <summary><h2>Card Connections</h2></summary>
+    <p>Every card in the deck, starting with the ones that connect least to the rest. A low score means few shared themes, not a bad card. The top card scores 100, and basic lands are left out.</p>
+    <div id="cardSynergy"></div>
 </details>
 
 <script src="card_tags.js"></script>
