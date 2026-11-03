@@ -45,6 +45,7 @@ let overlapCells = [];
 let showAllTags = false;
 let allCardTagCounts = null;
 let matchDeck = [];
+let gridSortTag = { cardSynergy: null, suggestedCards: null };
 let suggestionPool = [];
 let isAnalyzing = false;
 let previewedCard = null;
@@ -258,6 +259,7 @@ function prepareTagMatches(results) {
     );
 
     suggestionPool = [];
+    gridSortTag = { cardSynergy: null, suggestedCards: null };
 
     for (const [key, [name, colors, isLand]] of Object.entries(CARD_TAGS.suggestable)) {
 
@@ -309,35 +311,57 @@ function renderTagMatches() {
 
     document.getElementById("cardSynergy").innerHTML =
         selected.size === 0 ? noTags
-            : matchDeck.length > 0 ? tagGridHtml(deckRanking)
+            : matchDeck.length > 0 ? tagGridHtml(deckRanking, "cardSynergy")
             : "";
 
     document.getElementById("suggestedCards").innerHTML =
         selected.size === 0 ? noTags
-            : suggestions.length > 0 ? tagGridHtml(suggestions)
+            : suggestions.length > 0 ? tagGridHtml(suggestions, "suggestedCards")
             : "";
+}
+
+// Clicking a tag's header moves the cards with that tag to the top, keeping
+// their order. Clicking it again goes back to the usual order.
+function sortGrid(gridId, tagIndex) {
+
+    const tag = selectedTags()[tagIndex];
+
+    gridSortTag[gridId] = gridSortTag[gridId] === tag ? null : tag;
+
+    renderTagMatches();
 }
 
 // Rows are cards and columns are the selected tags, with a filled square for
 // each tag the card has.
-function tagGridHtml(rankedCards) {
+function tagGridHtml(rankedCards, gridId) {
 
     const tags = selectedTags();
 
+    const sortTag =
+        tags.includes(gridSortTag[gridId]) ? gridSortTag[gridId] : null;
+
+    const rows = sortTag
+        ? [
+            ...rankedCards.filter(card => card.matched.includes(sortTag)),
+            ...rankedCards.filter(card => !card.matched.includes(sortTag))
+        ]
+        : rankedCards;
+
     let html = `<table class="tag-grid"><tr><th>Card</th>`;
 
-    for (const tag of tags) {
-        html += `<th class="grid-tag"><span>${escapeHtml(tag)}</span></th>`;
-    }
+    tags.forEach((tag, i) => {
+        const sorted = tag === sortTag ? " sorted" : "";
+        html += `<th class="grid-tag${sorted}" onclick="sortGrid('${gridId}', ${i})"><span>${escapeHtml(tag)}</span></th>`;
+    });
 
     html += "</tr>";
 
-    for (const { name, matched } of rankedCards) {
+    for (const { name, matched } of rows) {
 
         html += `<tr><td class="grid-card">${cardNameHtml(name)}</td>`;
 
         for (const tag of tags) {
-            html += `<td class="${matched.includes(tag) ? "grid-on" : "grid-off"}"></td>`;
+            html += `<td class="${matched.includes(tag) ? "grid-on" : "grid-off"}" data-tip="${escapeHtml(tag)}"></td>`;
         }
 
         html += "</tr>";
@@ -1221,6 +1245,34 @@ function setUpCardViewer() {
     });
 }
 
+function setUpGridTips() {
+
+    const tip = document.getElementById("gridTip");
+
+    document.addEventListener("mouseover", event => {
+
+        const square = event.target.closest("[data-tip]");
+
+        if (square) {
+            tip.textContent = square.dataset.tip;
+            tip.hidden = false;
+            moveNearMouse(tip, event);
+        }
+    });
+
+    document.addEventListener("mousemove", event => {
+        if (!tip.hidden) {
+            moveNearMouse(tip, event);
+        }
+    });
+
+    document.addEventListener("mouseout", event => {
+        if (event.target.closest("[data-tip]")) {
+            tip.hidden = true;
+        }
+    });
+}
+
 function setUpCardPreview() {
 
     const preview = document.getElementById("cardPreview");
@@ -1350,5 +1402,6 @@ async function showVisitorCount() {
 
 setUpSavedSections();
 setUpCardPreview();
+setUpGridTips();
 setUpCardViewer();
 showVisitorCount();
