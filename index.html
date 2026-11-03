@@ -76,6 +76,12 @@
             cursor: pointer;
         }
 
+        .intro {
+            max-width: 75ch;
+            margin: -6px 0 24px;
+            line-height: 1.5;
+        }
+
         summary h2 {
             display: inline;
         }
@@ -252,10 +258,6 @@
             fill: rgba(255, 255, 255, 0.08);
         }
 
-        #cardGrid {
-            overflow-x: auto;
-        }
-
         .card-name {
             cursor: default;
         }
@@ -336,115 +338,13 @@
             overflow-x: auto;
         }
 
-        .score-table {
-            border-collapse: separate;
-            border-spacing: 0;
-        }
-
-        .score-table td {
-            padding: 2px 8px;
-            font-size: 12px;
-            white-space: nowrap;
-        }
-
-        .score-table td:first-child {
-            width: 35%;
-        }
-
-        .score {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .score-number {
-            flex: none;
-            width: 2.2em;
-            text-align: right;
-        }
-
-        .score-track {
-            flex: 1;
-            display: flex;
-            gap: 2px;
-        }
-
-        .score-bar {
-            flex: none;
-            min-width: 2px;
-            height: 10px;
-        }
-
-        /* A taller invisible hit area, since the bars are thin. */
-        .score-bar {
-            position: relative;
-        }
-
-        .score-bar::before {
-            content: "";
-            position: absolute;
-            inset: -5px 0;
-        }
-
-        #barTip {
-            position: fixed;
-            z-index: 10;
-            padding: 4px 8px;
-            font-size: 12px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            white-space: pre-line;
-            pointer-events: none;
-        }
-
-        #barTip::first-line {
-            font-weight: bold;
-        }
-
-        #barTip[hidden] {
-            display: none;
-        }
-
-        .score-bar:last-child {
-            border-radius: 0 2px 2px 0;
-        }
-
-        /* Colorblind-checked against the page background, in this order. */
-        .theme-1 { background: #3987e5; }
-        .theme-2 { background: #d95926; }
-        .theme-3 { background: #199e70; }
-        .theme-4 { background: #c98500; }
-        .theme-5 { background: #d55181; }
-        .theme-other { background: #3e434c; }
-
-        .theme-legend {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px 16px;
-            margin-bottom: 10px;
-            font-size: 12px;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .legend-swatch {
-            width: 10px;
-            height: 10px;
-            border-radius: 2px;
-        }
-
-        #cardGrid table {
+        .tag-grid {
             width: auto;
             border-collapse: separate;
             border-spacing: 0;
         }
 
-        #cardGrid th {
+        .tag-grid th {
             vertical-align: bottom;
         }
 
@@ -536,6 +436,8 @@
 <div id="visitorCount"></div>
 
 <h1 ondblclick="loadSampleDeck()">MTG Deck Tag Analyzer</h1>
+
+<p class="intro">Paste a Magic: The Gathering deck list to see what your cards do, using Scryfall's community tags. The charts show which tags your deck leans on, how they overlap, which cards share the most with each other, and cards outside your deck that match the tags you pick. Click any&nbsp;? for details.</p>
 
 <details open>
 <summary><h2>Deck List</h2><button class="help-button" aria-label="About Deck List" aria-expanded="false" onclick="toggleHelp(event, this)">?</button></summary>
@@ -635,32 +537,22 @@
     <div id="forceCards"></div>
 </details>
 
-<details id="gridSection" class="section" open>
-    <summary><h2>Card Grid</h2><button class="help-button" aria-label="About Card Grid" aria-expanded="false" onclick="toggleHelp(event, this)">?</button></summary>
-    <div class="help" hidden>
-        <p>Every card in your deck as a row, with a column for each selected tag. A filled square means the card has that tag.</p>
-        <p>Rows with few or no squares are cards that don't share the themes you selected, which can make them worth a closer look.</p>
-    </div>
-    <div id="cardGrid"></div>
-</details>
-
 <details id="synergySection" class="section" open>
-    <summary><h2>Connections in Your Deck</h2><button class="help-button" aria-label="About Connections in Your Deck" aria-expanded="false" onclick="toggleHelp(event, this)">?</button></summary>
+    <summary><h2>Tag Matches in Your Deck</h2><button class="help-button" aria-label="About Tag Matches in Your Deck" aria-expanded="false" onclick="toggleHelp(event, this)">?</button></summary>
     <div class="help" hidden>
-        <p>Each card's score is how strongly it ties into the rest of your deck. For every other card in the deck, the card earns points for the rarest tag the two share. Tags that are much more common in your deck than across all of Magic are worth more, and only tags on at least three of your cards count. Each other card counts once, so similar tags don't double up.</p>
-        <p>Scores use all of a card's tags, not just the selected ones, and the top card is set to 100. Basic lands are left out.</p>
-        <p>The colored parts of each bar show how much of the score comes from each of your deck's main themes. Similar tags share a color, and tags found on most of the deck count as other tags. Hover a part of a bar to see its tag.</p>
-        <p>A low score means a card shares few themes with the rest of the deck. It doesn't mean the card is bad: mana rocks, lands and strong staples often score low.</p>
+        <p>Every card in your deck, ranked by how many of the selected tags it has. Each column is a selected tag, and a filled square means the card has it. The list updates as you change the selected tags in Tags to Show.</p>
+        <p>Cards with the same count are ordered by how many tags they have in all, so cards more focused on the selected tags come first. Basic lands are left out.</p>
+        <p>A low count means a card has few of the selected tags. It doesn't mean the card is bad.</p>
     </div>
     <div id="cardSynergy"></div>
 </details>
 
 <details id="suggestedSection" class="section" open>
-    <summary><h2>Connections Outside Your Deck</h2><button class="help-button" aria-label="About Connections Outside Your Deck" aria-expanded="false" onclick="toggleHelp(event, this)">?</button></summary>
+    <summary><h2>Tag Matches Outside Your Deck</h2><button class="help-button" aria-label="About Tag Matches Outside Your Deck" aria-expanded="false" onclick="toggleHelp(event, this)">?</button></summary>
     <div class="help" hidden>
-        <p>Cards that aren't in your deck, scored the same way against your deck's cards. The score is then scaled by how much of the card is about your themes, so focused cards rank above cards that only touch them.</p>
-        <p>Only Commander legal cards within your deck's colors are included, based on the combined color identity of every card in the list. Lands are left out. The top 100 are shown, with the best match set to 100.</p>
-        <p>These come from tags alone, so a card can fit your themes without being a strong card. The bar colors match the section above.</p>
+        <p>Cards that aren't in your deck, ranked the same way: by how many of the selected tags they have, with more focused cards first when counts tie.</p>
+        <p>Only Commander legal cards within your deck's colors are included, based on the combined color identity of every card in the list. Lands are left out. The top 100 are shown, and they update as you change the selected tags.</p>
+        <p>These come from tags alone, so a card can match your tags without being a strong card.</p>
     </div>
     <div id="suggestedCards"></div>
 </details>
@@ -668,8 +560,6 @@
 <div id="loader"><span></span></div>
 
 <img id="cardPreview" alt="">
-
-<div id="barTip" hidden></div>
 
 <div id="cardViewer" hidden>
     <img id="cardViewerImage" alt="">

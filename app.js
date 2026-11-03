@@ -17,9 +17,6 @@ const DISTINCTIVE_TAGS = 4;
 const MIN_DISTINCTIVE_CARDS = 3;
 const NEAR_COPY_SHARE = 0.6;
 const SUGGESTED_CARDS = 100;
-const THEME_COLORS = 5;
-const MAX_THEME_SHARE = 0.5;
-const OTHER_TAGS_LISTED = 8;
 const LOADER_FADE_MS = 200;
 const LOADER_MIN_MS = 500;
 const MAX_FORCE_SHARED_TAGS = 4;
@@ -47,12 +44,11 @@ let tagCountEntries = [];
 let overlapCells = [];
 let showAllTags = false;
 let allCardTagCounts = null;
-let colorTags = [];
-let colorGroupOfTag = {};
+let matchDeck = [];
+let suggestionPool = [];
 let isAnalyzing = false;
 let previewedCard = null;
 let lastMouse = null;
-let synergyRanking = [];
 
 function escapeHtml(text) {
     return String(text)
@@ -246,285 +242,108 @@ function chooseDefaultTags(tagGroups, deckSize) {
     return chosen.map(([tag]) => tag);
 }
 
-function deckTagValues(cards) {
+// Done once per Analyze, so re-scoring on each tag change stays quick.
+function prepareTagMatches(results) {
 
-    const tagValues = {};
-
-    for (const [tag, tagCards] of groupCardsByTag(cards)) {
-        if (tagCards.length >= MIN_DISTINCTIVE_CARDS) {
-            tagValues[tag] =
-                Math.max(0, tagRarity(tag, tagCards, cards.length));
-        }
-    }
-
-    return tagValues;
-}
-
-// Each deck card counts once, by the rarest tag it shares with these tags, so
-// near-copy tags like scry and peek don't count the same connection twice.
-// The parts say how much of the score came through each tag.
-function scoreConnections(tags, cards, tagValues, self) {
-
-    let score = 0;
-    const parts = {};
-
-    for (const other of cards) {
-
-        if (other === self) {
-            continue;
-        }
-
-        let bestTag = null;
-        let best = 0;
-
-        for (const tag of tags) {
-            if ((tagValues[tag] || 0) > best && other.tags.includes(tag)) {
-                bestTag = tag;
-                best = tagValues[tag];
-            }
-        }
-
-        if (bestTag) {
-            score += best;
-            parts[bestTag] = (parts[bestTag] || 0) + best;
-        }
-    }
-
-    return { score, parts };
-}
-
-function rankCardsBySynergy(results) {
-
-    const cards =
+    matchDeck =
         results.filter(card => !BASIC_LAND.test(card.name));
-
-    const tagValues = deckTagValues(cards);
-
-    const ranked = cards.map(card => ({
-        name: card.name,
-        ...scoreConnections(card.tags, cards, tagValues, card)
-    }));
-
-    return ranked.sort(
-        (a, b) =>
-            b.score - a.score ||
-            a.name.localeCompare(b.name)
-    );
-}
-
-// The tags that add the most to the deck's connections get their own colors.
-// Near-copies such as repeatable-scry share the color of the tag they copy.
-// Tags on most of the deck, like activated-ability, describe cards rather than
-// themes, so they stay in "other tags".
-function chooseColorTags(ranking, results) {
-
-    const totals = {};
-
-    for (const { parts } of ranking) {
-        for (const [tag, value] of Object.entries(parts)) {
-            totals[tag] = (totals[tag] || 0) + value;
-        }
-    }
-
-    const tagCards = Object.fromEntries(groupCardsByTag(results));
-
-    colorTags = [];
-    colorGroupOfTag = {};
-
-    const themeTags = Object.keys(totals)
-        .filter(tag => tagCards[tag].length <= results.length * MAX_THEME_SHARE)
-        .sort((a, b) => totals[b] - totals[a]);
-
-    for (const tag of themeTags) {
-
-        const group = colorTags.findIndex(chosen =>
-            isNearCopy(tagCards[tag], tagCards[chosen])
-        );
-
-        if (group !== -1) {
-            colorGroupOfTag[tag] = group;
-        } else if (colorTags.length < THEME_COLORS) {
-            colorGroupOfTag[tag] = colorTags.length;
-            colorTags.push(tag);
-        }
-    }
-}
-
-function points(value, topScore) {
-    const rounded = Math.round(value / topScore * 100);
-    return rounded > 0 ? String(rounded) : "<1";
-}
-
-function otherTagsTip(otherParts, topScore) {
-
-    const sorted = otherParts.sort((a, b) => b[1] - a[1]);
-
-    const lines = sorted
-        .slice(0, OTHER_TAGS_LISTED)
-        .map(([tag, value]) => `${tag}: ${points(value, topScore)}`);
-
-    if (sorted.length > OTHER_TAGS_LISTED) {
-        lines.push(`and ${sorted.length - OTHER_TAGS_LISTED} more`);
-    }
-
-    return lines.join("\n");
-}
-
-function scoreSegmentsHtml(parts, topScore) {
-
-    const values = colorTags.map(() => 0);
-    const otherParts = [];
-
-    for (const [tag, value] of Object.entries(parts)) {
-        if (tag in colorGroupOfTag) {
-            values[colorGroupOfTag[tag]] += value;
-        } else {
-            otherParts.push([tag, value]);
-        }
-    }
-
-    const other =
-        otherParts.reduce((sum, [, value]) => sum + value, 0);
-
-    return [...values, other]
-        .map((value, i) => {
-
-            if (value <= 0) {
-                return "";
-            }
-
-            const isOther = i === colorTags.length;
-            const colorClass = isOther ? "theme-other" : `theme-${i + 1}`;
-            const tip = isOther
-                ? `other tags: ${points(value, topScore)}\n` + otherTagsTip(otherParts, topScore)
-                : `${colorTags[i]}: ${points(value, topScore)}`;
-
-            return `<span class="score-bar ${colorClass}" data-tip="${escapeHtml(tip)}" style="width: ${value / topScore * 100}%"></span>`;
-        })
-        .join("");
-}
-
-function themeLegendHtml() {
-
-    const items = [...colorTags, "other tags"]
-        .map((tag, i) => {
-
-            const colorClass =
-                i < colorTags.length ? `theme-${i + 1}` : "theme-other";
-
-            return `<span class="legend-item"><span class="legend-swatch ${colorClass}"></span>${escapeHtml(tag)}</span>`;
-        })
-        .join("");
-
-    return `<div class="theme-legend">${items}</div>`;
-}
-
-// Scores are shown out of 100, relative to the top card.
-function scoreTableHtml(scoredCards) {
-
-    const topScore = scoredCards[0]?.score || 1;
-
-    const rows = scoredCards
-        .map(({ name, score, parts }) => {
-
-            const percent = Math.round(score / topScore * 100);
-
-            return `
-            <tr>
-                <td>${cardNameHtml(name)}</td>
-                <td>
-                    <div class="score">
-                        <span class="score-number">${percent}</span>
-                        <span class="score-track">${scoreSegmentsHtml(parts, topScore)}</span>
-                    </div>
-                </td>
-            </tr>`;
-        })
-        .join("");
-
-    return themeLegendHtml() + `
-        <table class="score-table">
-            <tr><th>Card</th><th>Score</th></tr>
-            ${rows}
-        </table>`;
-}
-
-function renderCardSynergy() {
-
-    if (synergyRanking.length === 0) {
-        return;
-    }
-
-    document.getElementById("cardSynergy").innerHTML =
-        scoreTableHtml(synergyRanking);
-}
-
-// Scores cards outside the deck the same way as cards in it, then multiplies by
-// the share of the card's tags that fit, so cards mostly about the deck's themes win.
-function suggestCards(results) {
-
-    const cards =
-        results.filter(card => !BASIC_LAND.test(card.name));
-
-    const tagValues = deckTagValues(cards);
 
     const deckNames =
         new Set(results.map(card => card.name.toLowerCase()));
 
     const deckColors = new Set(
-        cards.flatMap(card => [
+        matchDeck.flatMap(card => [
             ...(CARD_TAGS.suggestable[card.name.toLowerCase()]?.[1] || "")
         ])
     );
 
-    const scored = [];
+    suggestionPool = [];
 
     for (const [key, [name, colors, isLand]] of Object.entries(CARD_TAGS.suggestable)) {
 
         const fitsColors =
             [...colors].every(color => deckColors.has(color));
 
-        if (isLand || deckNames.has(key) || !fitsColors) {
-            continue;
+        if (!isLand && !deckNames.has(key) && fitsColors) {
+            suggestionPool.push({
+                name,
+                tags: CARD_TAGS.cards[key].map(i => CARD_TAGS.tags[i])
+            });
         }
-
-        const tags =
-            CARD_TAGS.cards[key].map(i => CARD_TAGS.tags[i]);
-
-        const themeTags =
-            tags.filter(tag => tagValues[tag] > 0);
-
-        if (themeTags.length === 0) {
-            continue;
-        }
-
-        const { score, parts } =
-            scoreConnections(themeTags, cards, tagValues, null);
-
-        const focus = themeTags.length / tags.length;
-
-        for (const tag in parts) {
-            parts[tag] *= focus;
-        }
-
-        scored.push({ name, score: score * focus, parts });
     }
 
-    return scored
-        .sort(
-            (a, b) =>
-                b.score - a.score ||
-                a.name.localeCompare(b.name)
-        )
-        .slice(0, SUGGESTED_CARDS);
 }
 
-function renderSuggestedCards(results) {
+function scoreBySelectedTags(card, selected) {
+    return {
+        name: card.name,
+        matched: card.tags.filter(tag => selected.has(tag)),
+        tagCount: card.tags.length
+    };
+}
 
-    const cards = suggestCards(results);
+// Among cards with the same count, ones with fewer tags in all are more
+// focused on the selected tags, so they come first.
+function byScore(a, b) {
+    return b.matched.length - a.matched.length ||
+        a.tagCount - b.tagCount ||
+        a.name.localeCompare(b.name);
+}
+
+function renderTagMatches() {
+
+    const selected = new Set(selectedTags());
+
+    const deckRanking = matchDeck
+        .map(card => scoreBySelectedTags(card, selected))
+        .sort(byScore);
+
+    const suggestions = suggestionPool
+        .map(card => scoreBySelectedTags(card, selected))
+        .filter(card => card.matched.length > 0)
+        .sort(byScore)
+        .slice(0, SUGGESTED_CARDS);
+
+    const noTags =
+        "<p>Select tags in Tags to Show to score cards.</p>";
+
+    document.getElementById("cardSynergy").innerHTML =
+        selected.size === 0 ? noTags
+            : matchDeck.length > 0 ? tagGridHtml(deckRanking)
+            : "";
 
     document.getElementById("suggestedCards").innerHTML =
-        cards.length > 0 ? scoreTableHtml(cards) : "";
+        selected.size === 0 ? noTags
+            : suggestions.length > 0 ? tagGridHtml(suggestions)
+            : "";
+}
+
+// Rows are cards and columns are the selected tags, with a filled square for
+// each tag the card has.
+function tagGridHtml(rankedCards) {
+
+    const tags = selectedTags();
+
+    let html = `<table class="tag-grid"><tr><th>Card</th>`;
+
+    for (const tag of tags) {
+        html += `<th class="grid-tag"><span>${escapeHtml(tag)}</span></th>`;
+    }
+
+    html += "</tr>";
+
+    for (const { name, matched } of rankedCards) {
+
+        html += `<tr><td class="grid-card">${cardNameHtml(name)}</td>`;
+
+        for (const tag of tags) {
+            html += `<td class="${matched.includes(tag) ? "grid-on" : "grid-off"}"></td>`;
+        }
+
+        html += "</tr>";
+    }
+
+    return html + "</table>";
 }
 
 function selectedTagGroups() {
@@ -722,6 +541,7 @@ function renderOverlapGroups() {
 function tagSelectionChanged() {
     renderTagSummary();
     renderTagCharts();
+    renderTagMatches();
 }
 
 function renderTagChoices(tagGroups) {
@@ -1212,64 +1032,9 @@ function renderForceGraph() {
     drawForceGraph();
 }
 
-function renderCardGrid() {
-
-    const tags = selectedTags();
-
-    const grid = document.getElementById("cardGrid");
-
-    if (tags.length === 0) {
-        grid.innerHTML = "<p>Pick at least one tag to see the grid.</p>";
-        return;
-    }
-
-    // Sorting on which tags each card has puts similar cards next to each other.
-    const rows =
-        deckResults
-            .map(card => ({
-                name: card.name,
-                has: tags.map(tag => card.tags.includes(tag))
-            }))
-            .map(row => ({
-                ...row,
-                key: row.has.map(Number).join("")
-            }))
-            .sort(
-                (a, b) =>
-                    b.key.localeCompare(a.key) ||
-                    a.name.localeCompare(b.name)
-            );
-
-    let html = "<table><tr><th>Card</th>";
-
-    for (const tag of tags) {
-        html += `<th class="grid-tag"><span>${escapeHtml(tag)}</span></th>`;
-    }
-
-    html += "</tr>";
-
-    for (const { name, has } of rows) {
-
-        html += `<tr><td class="grid-card">${cardNameHtml(name)}</td>`;
-
-        for (const hasTag of has) {
-
-            const cssClass =
-                hasTag ? "grid-on" : "grid-off";
-
-            html += `<td class="${cssClass}"></td>`;
-        }
-
-        html += "</tr>";
-    }
-
-    grid.innerHTML = html + "</table>";
-}
-
 function renderTagCharts() {
     renderUpsetPlot();
     renderForceGraph();
-    renderCardGrid();
     renderOverlapGroups();
     renderTagCounts();
 }
@@ -1340,7 +1105,6 @@ function analyzeDeck() {
         document.getElementById("upsetPlot").innerHTML = "";
         document.getElementById("upsetCards").innerHTML = "";
         document.getElementById("forceCards").innerHTML = "";
-        document.getElementById("cardGrid").innerHTML = "";
         document.getElementById("tagCounts").innerHTML = "";
         document.getElementById("overlaps").innerHTML = "";
 
@@ -1369,13 +1133,11 @@ function analyzeDeck() {
         deckResults = results;
 
         renderProblems(notFound, results);
-        synergyRanking = rankCardsBySynergy(results);
-        chooseColorTags(synergyRanking, results);
+        prepareTagMatches(results);
 
-        renderCardSynergy();
-        renderSuggestedCards(results);
         renderTagChoices(tagGroups);
         renderTagCharts();
+        renderTagMatches();
 
         setStatus(
             `Finished analyzing ${results.length} cards.`,
@@ -1456,34 +1218,6 @@ function setUpCardViewer() {
     viewer.addEventListener("click", () => {
         viewer.hidden = true;
         image.removeAttribute("src");
-    });
-}
-
-function setUpBarTips() {
-
-    const tip = document.getElementById("barTip");
-
-    document.addEventListener("mouseover", event => {
-
-        const segment = event.target.closest("[data-tip]");
-
-        if (segment) {
-            tip.textContent = segment.dataset.tip;
-            tip.hidden = false;
-            moveNearMouse(tip, event);
-        }
-    });
-
-    document.addEventListener("mousemove", event => {
-        if (!tip.hidden) {
-            moveNearMouse(tip, event);
-        }
-    });
-
-    document.addEventListener("mouseout", event => {
-        if (event.target.closest("[data-tip]")) {
-            tip.hidden = true;
-        }
     });
 }
 
@@ -1616,6 +1350,5 @@ async function showVisitorCount() {
 
 setUpSavedSections();
 setUpCardPreview();
-setUpBarTips();
 setUpCardViewer();
 showVisitorCount();
