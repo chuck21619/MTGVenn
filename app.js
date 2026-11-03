@@ -16,7 +16,7 @@ const DEFAULT_TAGS = ["removal", "card-advantage", "ramp"];
 const DISTINCTIVE_TAGS = 4;
 const MIN_DISTINCTIVE_CARDS = 3;
 const NEAR_COPY_SHARE = 0.6;
-const SUGGESTED_CARDS = 5;
+const SUGGESTED_CARDS = 20;
 const LOADER_FADE_MS = 200;
 const LOADER_MIN_MS = 500;
 const MAX_FORCE_SHARED_TAGS = 4;
@@ -398,7 +398,9 @@ function renderSuggestedCards(results) {
     const cards = suggestCards(results);
 
     document.getElementById("suggestedCards").innerHTML =
-        cards.length > 0 ? cardListHtml("Suggested cards", cards) : "";
+        cards.length > 0
+            ? `<div class="combo">${cards.map(cardNameHtml).join("<br>")}</div>`
+            : "";
 }
 
 function selectedTagGroups() {
