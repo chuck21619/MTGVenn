@@ -427,7 +427,7 @@ function tagCountsSvg(entries) {
 
     const scaleY = value => baseline - value / mostCards * plotHeight;
 
-    let svg = `<svg width="${width}" height="${height}" role="img" aria-label="Bar graph of cards per tag">`;
+    let svg = `<svg width="${width}" height="${height}" data-plot="${left} ${top} 20 ${bottom}" role="img" aria-label="Bar graph of cards per tag">`;
 
     for (let value = 0; value <= mostCards; value += tickStep) {
         svg += `
@@ -537,7 +537,7 @@ function overlapSvg(tags, cells) {
     const mostCards =
         Math.max(...cells.map(cell => cell.cards.length), 1);
 
-    let svg = `<svg width="${width}" height="${height}" role="img" aria-label="Heatmap of cards shared between tags">`;
+    let svg = `<svg width="${width}" height="${height}" data-plot="${left} ${top} 20 ${bottom}" role="img" aria-label="Heatmap of cards shared between tags">`;
 
     // The first tag has no row and the last has no column, so the grid is a triangle.
     tags.slice(1).forEach((tag, i) => {
@@ -1118,29 +1118,47 @@ function renderTagCharts() {
     renderForceGraph();
     renderOverlapGroups();
     renderTagCounts();
-    centerChartsVertically();
+    centerCharts();
 }
 
-// Side by side, the shorter chart gets padding above it so both sit centered
-// on the same line. Stacked, neither needs it.
-function centerChartsVertically() {
+// Centers each chart's plot, not its labels: the bars and the grid sit in the
+// middle of their panels, and side by side their middles line up. Each chart
+// lists its label margins (left, top, right, bottom) in data-plot.
+function centerCharts() {
 
-    const containers = [
-        document.getElementById("tagCounts"),
-        document.getElementById("overlaps")
-    ];
+    const charts = ["tagCounts", "overlaps"]
+        .map(id => document.getElementById(id))
+        .map(container => ({ container, svg: container.querySelector("svg") }))
+        .filter(({ svg }) => svg);
 
-    const heights = containers.map(container =>
-        Number(container.querySelector("svg")?.getAttribute("height") || 0)
-    );
+    for (const chart of charts) {
 
-    const tallest = Math.max(...heights);
+        const [left, top, right, bottom] =
+            chart.svg.dataset.plot.split(" ").map(Number);
 
-    containers.forEach((container, i) => {
-        container.style.paddingTop = SIDE_BY_SIDE.matches
-            ? `${(tallest - heights[i]) / 2}px`
+        const width = Number(chart.svg.getAttribute("width"));
+        const height = Number(chart.svg.getAttribute("height"));
+        // Shifts only as far as the spare space allows, so no label gets cut off.
+        const room =
+            Math.max(0, (chart.container.clientWidth - width) / 2);
+
+        const shift =
+            Math.sign(left - right) * Math.min(Math.abs(left - right) / 2, room);
+
+        chart.svg.style.position = "relative";
+        chart.svg.style.left = `${-shift}px`;
+
+        chart.plotMiddle = top + (height - top - bottom) / 2;
+    }
+
+    const lowestMiddle =
+        Math.max(...charts.map(chart => chart.plotMiddle));
+
+    for (const chart of charts) {
+        chart.container.style.paddingTop = SIDE_BY_SIDE.matches
+            ? `${lowestMiddle - chart.plotMiddle}px`
             : "";
-    });
+    }
 }
 
 function renderProblems(notFound, results) {
@@ -1556,10 +1574,11 @@ window.addEventListener("resize", () => {
         requestAnimationFrame(() => {
             resizePending = false;
             resizeForceGraph();
+            centerCharts();
         });
     }
 });
-SIDE_BY_SIDE.addEventListener("change", centerChartsVertically);
+SIDE_BY_SIDE.addEventListener("change", centerCharts);
 setUpCardPreview();
 setUpGridTips();
 setUpGridHighlight();
