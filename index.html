@@ -51,6 +51,7 @@
             box-sizing: border-box;
             font-family: monospace;
             font-size: var(--text-small);
+            resize: none;
             background: var(--surface);
             color: var(--text);
             border: 1px solid var(--border);
@@ -147,16 +148,30 @@
             border-radius: var(--radius);
         }
 
+        /* Up to three columns, down to one on a phone, centered under the controls. */
         #tagChoices {
-            max-width: 420px;
-            margin-bottom: 15px;
+            columns: 240px 3;
+            column-gap: 32px;
+            max-width: 900px;
+            margin: 0 auto 15px;
         }
 
         #tagChoices label {
             display: flex;
             gap: 8px;
             padding: 3px 6px;
+            break-inside: avoid;
+            color: var(--muted);
+            border-radius: var(--radius);
             cursor: pointer;
+        }
+
+        #tagChoices label:has(input:checked) {
+            color: var(--text);
+        }
+
+        #tagChoices input {
+            accent-color: var(--accent);
         }
 
         #tagChoices label[hidden] {
@@ -172,10 +187,14 @@
             color: var(--muted);
         }
 
+        /* Same width as the tag columns below, so the controls line up with them. */
         #tagControls {
             display: flex;
             flex-wrap: wrap;
             align-items: center;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
             gap: 10px;
             margin-bottom: 15px;
         }
@@ -595,7 +614,7 @@
             oninput="filterTagChoices()">
         <button id="tagShowAll" onclick="toggleAllTags()"></button>
         <span id="tagSummary"></span>
-        <button id="tagClearAll" onclick="clearAllTags()">Clear all</button>
+        <button id="tagClearAll" onclick="clearAllTags()">Clear all tags</button>
     </div>
     <div id="tagChoices"></div>
 </details>

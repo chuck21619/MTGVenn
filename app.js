@@ -997,6 +997,31 @@ function drawForceGraph() {
     }
 }
 
+// Stretches the finished layout to the new width instead of laying it out
+// again, so the graph keeps its shape and any selected card stays selected.
+function resizeForceGraph() {
+
+    const canvas = document.getElementById("forceCanvas");
+    const width = canvas.parentElement.clientWidth;
+    const oldWidth = parseFloat(canvas.style.width);
+
+    if (!oldWidth || width === 0 || width === oldWidth)
+        return;
+
+    const scale = window.devicePixelRatio || 1;
+
+    for (const node of forceNodes) {
+        node.x = FORCE_PADDING +
+            (node.x - FORCE_PADDING) / (oldWidth - FORCE_PADDING * 2) *
+            (width - FORCE_PADDING * 2);
+    }
+
+    canvas.width = width * scale;
+    canvas.style.width = `${width}px`;
+
+    drawForceGraph();
+}
+
 function nodeAt(x, y) {
 
     return forceNodes.find(node =>
@@ -1520,6 +1545,20 @@ async function showVisitorCount() {
 }
 
 setUpSavedSections();
+
+let resizePending = false;
+
+window.addEventListener("resize", () => {
+
+    if (!resizePending) {
+        resizePending = true;
+
+        requestAnimationFrame(() => {
+            resizePending = false;
+            resizeForceGraph();
+        });
+    }
+});
 SIDE_BY_SIDE.addEventListener("change", centerChartsVertically);
 setUpCardPreview();
 setUpGridTips();
