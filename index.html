@@ -283,10 +283,19 @@
         #cardPreview {
             position: fixed;
             z-index: 10;
-            width: 244px;
-            border-radius: 12px;
+            display: flex;
+            gap: 8px;
             pointer-events: none;
             visibility: hidden;
+        }
+
+        #cardPreview img {
+            width: 244px;
+            border-radius: 12px;
+        }
+
+        #cardPreview img[hidden], #cardViewer img[hidden] {
+            display: none;
         }
 
         #cardPreview.visible {
@@ -336,6 +345,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 12px;
             background: rgba(0, 0, 0, 0.8);
         }
 
@@ -343,9 +353,24 @@
             display: none;
         }
 
-        #cardViewerImage {
+        #cardViewer img {
             width: min(90vw, 64vh, 400px);
             border-radius: 16px;
+        }
+
+        /* Two faces sit side by side, or stacked on a phone held upright. */
+        #cardViewer.two-faces img {
+            width: min(44vw, 64vh, 400px);
+        }
+
+        @media (orientation: portrait) {
+            #cardViewer.two-faces {
+                flex-direction: column;
+            }
+
+            #cardViewer.two-faces img {
+                width: min(90vw, 31vh, 400px);
+            }
         }
 
         #cardSynergy, #suggestedCards {
@@ -537,7 +562,7 @@
     <summary><h2>Tag Matches Outside Your Deck</h2><button class="help-button" aria-label="About Tag Matches Outside Your Deck" aria-expanded="false" onclick="toggleHelp(event, this)">?</button></summary>
     <div class="help" hidden>
         <p>Cards that aren't in your deck, ranked by how many of the selected tags they have. Each column is a selected tag, and a filled square means the card has it. Cards with the same count are ordered by how many tags they have in all, so cards more focused on the selected tags come first.</p>
-        <p>Only Commander legal cards within your deck's colors are included, based on the combined color identity of every card in the list. Lands are left out. The top 100 are shown, and they update as you change the selected tags. Click a tag at the top of a column to move the cards with that tag to the top, and click it again to undo.</p>
+        <p>Only Commander legal cards within your deck's colors are included, based on the combined color identity of every card in the list. Lands are left out. The list is as long as the one for your deck, and it updates as you change the selected tags. Click a tag at the top of a column to move the cards with that tag to the top, and click it again to undo.</p>
         <p>These come from tags alone, so a card can match your tags without being a strong card.</p>
     </div>
     <div id="suggestedCards"></div>
@@ -600,12 +625,16 @@
 
 <div id="loader"><span></span></div>
 
-<img id="cardPreview" alt="">
+<div id="cardPreview">
+    <img id="previewFront" alt="">
+    <img id="previewBack" alt="" hidden>
+</div>
 
 <div id="gridTip" hidden></div>
 
 <div id="cardViewer" hidden>
-    <img id="cardViewerImage" alt="">
+    <img id="viewerFront" alt="">
+    <img id="viewerBack" alt="" hidden>
 </div>
 
 <script src="card_tags.js"></script>

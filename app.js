@@ -16,7 +16,6 @@ const DEFAULT_TAGS = ["removal", "card-advantage", "ramp"];
 const DISTINCTIVE_TAGS = 4;
 const MIN_DISTINCTIVE_CARDS = 3;
 const NEAR_COPY_SHARE = 0.6;
-const SUGGESTED_CARDS = 100;
 const LOADER_FADE_MS = 200;
 const LOADER_MIN_MS = 500;
 const MAX_FORCE_SHARED_TAGS = 4;
@@ -304,7 +303,7 @@ function renderTagMatches() {
         .map(card => scoreBySelectedTags(card, selected))
         .filter(card => card.matched.length > 0)
         .sort(byScore)
-        .slice(0, SUGGESTED_CARDS);
+        .slice(0, deckRanking.length);
 
     const noTags =
         "<p>Select tags in Tags to Show to score cards.</p>";
@@ -1198,9 +1197,29 @@ function moveNearMouse(preview, event) {
     preview.style.top = `${Math.max(PREVIEW_GAP, top)}px`;
 }
 
-function cardImageUrl(name) {
+function cardImageUrl(name, face = "front") {
     return `${CARD_IMAGE_URL}?exact=${encodeURIComponent(name)}` +
-        "&format=image&version=normal";
+        `&format=image&version=normal&face=${face}`;
+}
+
+// Only double-faced cards have a back image. Split and adventure cards also
+// have "//" in their names, but Scryfall refuses their back, which hides it.
+function loadCardFaces(name, front, back) {
+
+    front.src = cardImageUrl(name);
+    back.hidden = true;
+
+    if (name.includes("//")) {
+        back.src = cardImageUrl(name, "back");
+    } else {
+        back.removeAttribute("src");
+    }
+}
+
+function clearCardFaces(front, back) {
+    front.removeAttribute("src");
+    back.removeAttribute("src");
+    back.hidden = true;
 }
 
 function showCardPreview(name) {
@@ -1212,36 +1231,50 @@ function showCardPreview(name) {
 
     previewedCard = name;
 
-    document.getElementById("cardPreview").src = cardImageUrl(name);
+    loadCardFaces(
+        name,
+        document.getElementById("previewFront"),
+        document.getElementById("previewBack")
+    );
 }
 
 function hideCardPreview() {
 
-    const preview = document.getElementById("cardPreview");
-
     previewedCard = null;
-    preview.classList.remove("visible");
-    preview.removeAttribute("src");
+
+    document.getElementById("cardPreview").classList.remove("visible");
+
+    clearCardFaces(
+        document.getElementById("previewFront"),
+        document.getElementById("previewBack")
+    );
 }
 
 function setUpCardViewer() {
 
     const viewer = document.getElementById("cardViewer");
-    const image = document.getElementById("cardViewerImage");
+    const front = document.getElementById("viewerFront");
+    const back = document.getElementById("viewerBack");
+
+    back.addEventListener("load", () => {
+        back.hidden = false;
+        viewer.classList.add("two-faces");
+    });
 
     document.addEventListener("click", event => {
 
         const card = event.target.closest(".card-name");
 
         if (TOUCH_SCREEN && card) {
-            image.src = cardImageUrl(card.dataset.card);
+            viewer.classList.remove("two-faces");
+            loadCardFaces(card.dataset.card, front, back);
             viewer.hidden = false;
         }
     });
 
     viewer.addEventListener("click", () => {
         viewer.hidden = true;
-        image.removeAttribute("src");
+        clearCardFaces(front, back);
     });
 }
 
@@ -1276,10 +1309,16 @@ function setUpGridTips() {
 function setUpCardPreview() {
 
     const preview = document.getElementById("cardPreview");
+    const back = document.getElementById("previewBack");
 
     // Stays hidden until loaded, so the last card never flashes up first.
-    preview.addEventListener("load", () => {
+    document.getElementById("previewFront").addEventListener("load", () => {
         preview.classList.add("visible");
+        moveNearMouse(preview, lastMouse);
+    });
+
+    back.addEventListener("load", () => {
+        back.hidden = false;
         moveNearMouse(preview, lastMouse);
     });
 
