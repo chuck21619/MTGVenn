@@ -21,6 +21,7 @@ const LOADER_MIN_MS = 500;
 const MAX_FORCE_SHARED_TAGS = 4;
 const CARD_IMAGE_URL = "https://api.scryfall.com/cards/named";
 const PREVIEW_GAP = 16;
+const SIDE_BY_SIDE = window.matchMedia("(min-width: 900px)");
 const TOUCH_SCREEN = window.matchMedia("(hover: none)").matches;
 const BASIC_LAND =
     /^((snow-covered )?(plains|island|swamp|mountain|forest)|wastes)$/i;
@@ -1060,6 +1061,29 @@ function renderTagCharts() {
     renderForceGraph();
     renderOverlapGroups();
     renderTagCounts();
+    centerChartsVertically();
+}
+
+// Side by side, the shorter chart gets padding above it so both sit centered
+// on the same line. Stacked, neither needs it.
+function centerChartsVertically() {
+
+    const containers = [
+        document.getElementById("tagCounts"),
+        document.getElementById("overlaps")
+    ];
+
+    const heights = containers.map(container =>
+        Number(container.querySelector("svg")?.getAttribute("height") || 0)
+    );
+
+    const tallest = Math.max(...heights);
+
+    containers.forEach((container, i) => {
+        container.style.paddingTop = SIDE_BY_SIDE.matches
+            ? `${(tallest - heights[i]) / 2}px`
+            : "";
+    });
 }
 
 function renderProblems(notFound, results) {
@@ -1440,6 +1464,7 @@ async function showVisitorCount() {
 }
 
 setUpSavedSections();
+SIDE_BY_SIDE.addEventListener("change", centerChartsVertically);
 setUpCardPreview();
 setUpGridTips();
 setUpCardViewer();

@@ -78,7 +78,7 @@
 
         /* Side by side when there's room, stacked on phones. */
         @media (min-width: 900px) {
-            .match-sections {
+            .side-by-side {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
                 gap: 30px;
@@ -86,7 +86,7 @@
             }
         }
 
-        .match-sections > details {
+        .side-by-side > details {
             min-width: 0;
         }
 
@@ -440,6 +440,7 @@
 
         #tagCounts {
             overflow-x: auto;
+            text-align: center;
         }
 
         .count-grid {
@@ -465,6 +466,7 @@
 
         #overlaps {
             overflow-x: auto;
+            text-align: center;
         }
 
         .overlap-empty {
@@ -546,7 +548,7 @@
     <div id="tagChoices"></div>
 </details>
 
-<div class="match-sections">
+<div class="side-by-side">
 
 <details id="synergySection" class="section" open>
     <summary><h2>Tag Matches in Your Deck</h2><button class="help-button" aria-label="About Tag Matches in Your Deck" aria-expanded="false" onclick="toggleHelp(event, this)">?</button></summary>
@@ -570,6 +572,8 @@
 
 </div>
 
+<div class="side-by-side">
+
 <details id="countsSection" class="section" open>
     <summary><h2>Tag Counts</h2><button class="help-button" aria-label="About Tag Counts" aria-expanded="false" onclick="toggleHelp(event, this)">?</button></summary>
     <div class="help" hidden>
@@ -589,6 +593,8 @@
     <div id="overlaps"></div>
     <div id="overlapCards"></div>
 </details>
+
+</div>
 
 <details id="upsetSection" class="section" open>
     <summary><h2>UpSet Plot</h2><button class="help-button" aria-label="About UpSet Plot" aria-expanded="false" onclick="toggleHelp(event, this)">?</button></summary>
