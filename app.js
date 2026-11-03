@@ -21,6 +21,8 @@ const LOADER_MIN_MS = 500;
 const MAX_FORCE_SHARED_TAGS = 4;
 const CARD_IMAGE_URL = "https://api.scryfall.com/cards/named";
 const PREVIEW_GAP = 16;
+const GRID_COLUMN_WIDTH = 27;
+const SLANT = Math.SQRT1_2;
 const SIDE_BY_SIDE = window.matchMedia("(min-width: 900px)");
 const TOUCH_SCREEN = window.matchMedia("(hover: none)").matches;
 const BASIC_LAND =
@@ -347,7 +349,19 @@ function tagGridHtml(rankedCards, gridId) {
         ]
         : rankedCards;
 
-    let html = `<table class="tag-grid"><tr><th>Card</th>`;
+    // Slanted labels need room above the grid, and the last ones lean past
+    // its right edge, so the wrapper adds that much space on the right.
+    const widths = tags.map(textWidth);
+
+    const headerHeight =
+        Math.ceil(Math.max(0, ...widths) * SLANT) + 12;
+
+    const overhang = Math.max(0, ...widths.map((width, i) =>
+        width * SLANT - (tags.length - i - 0.5) * GRID_COLUMN_WIDTH
+    ));
+
+    let html = `<div class="tag-grid-wrap" style="padding-right: ${Math.ceil(overhang)}px">` +
+        `<table class="tag-grid"><tr style="height: ${headerHeight}px"><th>Card</th>`;
 
     tags.forEach((tag, i) => {
         const sorted = tag === sortTag ? " sorted" : "";
@@ -361,13 +375,29 @@ function tagGridHtml(rankedCards, gridId) {
         html += `<tr><td class="grid-card">${cardNameHtml(name)}</td>`;
 
         for (const tag of tags) {
-            html += `<td class="${matched.includes(tag) ? "grid-on" : "grid-off"}" data-tip="${escapeHtml(tag)}"></td>`;
+            html += matched.includes(tag)
+                ? `<td class="grid-on" data-tip="${escapeHtml(tag)}"><span class="grid-mark"></span></td>`
+                : `<td class="grid-off" data-tip="${escapeHtml(tag)}"></td>`;
         }
 
         html += "</tr>";
     }
 
-    return html + "</table>";
+    return html + "</table></div>";
+}
+
+// Measures text in the grid's label font, to size the slanted headers.
+function textWidth(text) {
+
+    const context =
+        (textWidth.canvas ||= document.createElement("canvas")).getContext("2d");
+
+    const bodyStyle = getComputedStyle(document.body);
+
+    context.font =
+        `${bodyStyle.getPropertyValue("--text-small")} ${bodyStyle.fontFamily}`;
+
+    return context.measureText(text).width;
 }
 
 function selectedTagGroups() {
@@ -956,7 +986,9 @@ function drawForceGraph() {
 
     context.globalAlpha = 1;
     context.fillStyle = text;
-    context.font = "12px Arial, sans-serif";
+    const bodyStyle = getComputedStyle(document.body);
+    context.font =
+        `${style.getPropertyValue("--text-small")} ${bodyStyle.fontFamily}`;
 
     const labeled = active ? [...neighbors, active] : [];
 
@@ -1302,6 +1334,30 @@ function setUpCardViewer() {
     });
 }
 
+function setUpGridHighlight() {
+
+    const columnCells = cell =>
+        [...cell.closest("table").rows].map(row => row.cells[cell.cellIndex]);
+
+    document.addEventListener("mouseover", event => {
+
+        const cell = event.target.closest(".tag-grid td, .tag-grid th");
+
+        if (cell && cell.cellIndex > 0) {
+            columnCells(cell).forEach(c => c?.classList.add("col-hover"));
+        }
+    });
+
+    document.addEventListener("mouseout", event => {
+
+        const cell = event.target.closest(".tag-grid td, .tag-grid th");
+
+        if (cell && cell.cellIndex > 0) {
+            columnCells(cell).forEach(c => c?.classList.remove("col-hover"));
+        }
+    });
+}
+
 function setUpGridTips() {
 
     const tip = document.getElementById("gridTip");
@@ -1467,5 +1523,6 @@ setUpSavedSections();
 SIDE_BY_SIDE.addEventListener("change", centerChartsVertically);
 setUpCardPreview();
 setUpGridTips();
+setUpGridHighlight();
 setUpCardViewer();
 showVisitorCount();

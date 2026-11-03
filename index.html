@@ -16,6 +16,15 @@
             --accent: #7fb2ff;
             --error: #ff8a80;
             --faint: #5f6673;
+            --grid-line: #262a31;
+            --highlight: rgba(127, 178, 255, 0.12);
+            --muted: #9aa1ad;
+
+            /* One font at two sizes: body text, and labels in charts and tables. */
+            --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --text-base: 15px;
+            --text-small: 13px;
+            --radius: 6px;
         }
 
         html {
@@ -23,7 +32,9 @@
         }
 
         body {
-            font-family: Arial, sans-serif;
+            font-family: var(--font);
+            font-size: var(--text-base);
+            line-height: 1.4;
             max-width: 1400px;
             margin: auto;
             padding: 20px;
@@ -31,10 +42,15 @@
             color: var(--text);
         }
 
+        button, input, textarea {
+            font: inherit;
+        }
+
         textarea {
             width: 100%;
             box-sizing: border-box;
             font-family: monospace;
+            font-size: var(--text-small);
             background: var(--surface);
             color: var(--text);
             border: 1px solid var(--border);
@@ -47,7 +63,7 @@
             background: var(--surface);
             color: var(--text);
             border: 1px solid var(--border);
-            border-radius: 5px;
+            border-radius: var(--radius);
         }
 
         table {
@@ -69,7 +85,7 @@
             top: 6px;
             right: 10px;
             color: var(--faint);
-            font-size: 11px;
+            font-size: var(--text-small);
         }
 
         summary {
@@ -116,8 +132,7 @@
             margin: 10px 0;
             padding: 4px 14px;
             background: var(--surface);
-            border-radius: 5px;
-            font-size: 14px;
+            border-radius: var(--radius);
             line-height: 1.5;
         }
 
@@ -129,7 +144,7 @@
             margin-bottom: 10px;
             padding: 10px;
             background: var(--surface);
-            border-radius: 5px;
+            border-radius: var(--radius);
         }
 
         #tagChoices {
@@ -154,6 +169,7 @@
 
         .tag-count {
             margin-left: auto;
+            color: var(--muted);
         }
 
         #tagControls {
@@ -181,11 +197,12 @@
             background: var(--surface);
             color: var(--text);
             border: 1px solid var(--border);
-            border-radius: 5px;
+            border-radius: var(--radius);
         }
 
         #upsetPlot {
             overflow-x: auto;
+            text-align: center;
         }
 
         #forceGraph {
@@ -247,7 +264,7 @@
 
         .upset-label, .upset-count {
             fill: var(--text);
-            font-size: 12px;
+            font-size: var(--text-small);
         }
 
         .upset-set, .upset-bar, .upset-dot-on {
@@ -377,19 +394,48 @@
             overflow-x: auto;
         }
 
+        .tag-grid-wrap {
+            width: fit-content;
+            margin: 0 auto;
+        }
+
         .tag-grid {
             width: auto;
-            border-collapse: separate;
-            border-spacing: 0;
+            border-collapse: collapse;
+        }
+
+        .tag-grid th, .tag-grid td {
+            border: 1px solid var(--grid-line);
         }
 
         .tag-grid th {
             vertical-align: bottom;
         }
 
+        .tag-grid th:first-child {
+            padding: 6px 8px;
+            font-size: var(--text-small);
+            text-align: left;
+        }
+
+        /* The row and column under the mouse, to follow a card or a tag. */
+        .tag-grid tr:hover td, .tag-grid .col-hover {
+            background-color: var(--highlight);
+        }
+
+        /* Slanted labels, like the charts: the header row has no lines, and
+           each label leans up and right from the middle of its column. */
+        .tag-grid th {
+            border: none;
+            border-bottom: 1px solid var(--grid-line);
+        }
+
         .grid-tag {
-            padding: 6px 4px;
-            font-size: 12px;
+            position: relative;
+            width: 27px;
+            min-width: 27px;
+            padding: 0;
+            font-size: var(--text-small);
             font-weight: normal;
         }
 
@@ -402,15 +448,17 @@
         }
 
         .grid-tag span {
-            display: inline-block;
-            writing-mode: vertical-rl;
-            transform: rotate(180deg);
+            position: absolute;
+            bottom: 6px;
+            left: 50%;
             white-space: nowrap;
+            transform-origin: bottom left;
+            transform: rotate(-45deg);
         }
 
         .grid-card {
             padding: 2px 8px;
-            font-size: 12px;
+            font-size: var(--text-small);
             white-space: nowrap;
         }
 
@@ -418,10 +466,10 @@
             position: fixed;
             z-index: 10;
             padding: 4px 8px;
-            font-size: 12px;
+            font-size: var(--text-small);
             background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: var(--radius);
             pointer-events: none;
         }
 
@@ -430,11 +478,15 @@
         }
 
         .grid-on, .grid-off {
-            min-width: 18px;
-            padding: 0;
+            min-width: 15px;
+            padding: 2px;
         }
 
-        .grid-on {
+        /* An inset square, with the gap around it still showing the highlight. */
+        .grid-mark {
+            display: block;
+            width: 15px;
+            height: 15px;
             background: var(--accent);
         }
 
@@ -449,7 +501,7 @@
 
         .count-text {
             fill: var(--text);
-            font-size: 12px;
+            font-size: var(--text-small);
         }
 
         .count-hit {
@@ -483,7 +535,7 @@
 
         .overlap-text-dark {
             fill: var(--bg);
-            font-size: 12px;
+            font-size: var(--text-small);
         }
 
         .loading {
