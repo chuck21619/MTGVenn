@@ -16,7 +16,10 @@ const DEFAULT_TAGS = ["removal", "card-advantage", "ramp"];
 const DISTINCTIVE_TAGS = 4;
 const MIN_DISTINCTIVE_CARDS = 3;
 const NEAR_COPY_SHARE = 0.6;
-const SUGGESTED_CARDS = 20;
+const SUGGESTED_CARDS = 100;
+const THEME_COLORS = 5;
+const MAX_THEME_SHARE = 0.5;
+const OTHER_TAGS_LISTED = 8;
 const LOADER_FADE_MS = 200;
 const LOADER_MIN_MS = 500;
 const MAX_FORCE_SHARED_TAGS = 4;
@@ -44,6 +47,8 @@ let tagCountEntries = [];
 let overlapCells = [];
 let showAllTags = false;
 let allCardTagCounts = null;
+let colorTags = [];
+let colorGroupOfTag = {};
 let isAnalyzing = false;
 let previewedCard = null;
 let lastMouse = null;
@@ -255,8 +260,39 @@ function deckTagValues(cards) {
     return tagValues;
 }
 
-// Each other card counts once, by the rarest tag it shares with this card, so
+// Each deck card counts once, by the rarest tag it shares with these tags, so
 // near-copy tags like scry and peek don't count the same connection twice.
+// The parts say how much of the score came through each tag.
+function scoreConnections(tags, cards, tagValues, self) {
+
+    let score = 0;
+    const parts = {};
+
+    for (const other of cards) {
+
+        if (other === self) {
+            continue;
+        }
+
+        let bestTag = null;
+        let best = 0;
+
+        for (const tag of tags) {
+            if ((tagValues[tag] || 0) > best && other.tags.includes(tag)) {
+                bestTag = tag;
+                best = tagValues[tag];
+            }
+        }
+
+        if (bestTag) {
+            score += best;
+            parts[bestTag] = (parts[bestTag] || 0) + best;
+        }
+    }
+
+    return { score, parts };
+}
+
 function rankCardsBySynergy(results) {
 
     const cards =
@@ -264,44 +300,132 @@ function rankCardsBySynergy(results) {
 
     const tagValues = deckTagValues(cards);
 
-    const ranked = cards.map(card => {
-
-        let score = 0;
-
-        for (const other of cards) {
-
-            if (other === card) {
-                continue;
-            }
-
-            const sharedValues = card.tags
-                .filter(tag => other.tags.includes(tag))
-                .map(tag => tagValues[tag] || 0);
-
-            score += Math.max(0, ...sharedValues);
-        }
-
-        return { name: card.name, score };
-    });
+    const ranked = cards.map(card => ({
+        name: card.name,
+        ...scoreConnections(card.tags, cards, tagValues, card)
+    }));
 
     return ranked.sort(
         (a, b) =>
-            a.score - b.score ||
+            b.score - a.score ||
             a.name.localeCompare(b.name)
     );
 }
 
-function renderCardSynergy() {
+// The tags that add the most to the deck's connections get their own colors.
+// Near-copies such as repeatable-scry share the color of the tag they copy.
+// Tags on most of the deck, like activated-ability, describe cards rather than
+// themes, so they stay in "other tags".
+function chooseColorTags(ranking, results) {
 
-    if (synergyRanking.length === 0) {
-        return;
+    const totals = {};
+
+    for (const { parts } of ranking) {
+        for (const [tag, value] of Object.entries(parts)) {
+            totals[tag] = (totals[tag] || 0) + value;
+        }
     }
 
-    const topScore =
-        synergyRanking.at(-1)?.score || 1;
+    const tagCards = Object.fromEntries(groupCardsByTag(results));
 
-    const rows = synergyRanking
-        .map(({ name, score }) => {
+    colorTags = [];
+    colorGroupOfTag = {};
+
+    const themeTags = Object.keys(totals)
+        .filter(tag => tagCards[tag].length <= results.length * MAX_THEME_SHARE)
+        .sort((a, b) => totals[b] - totals[a]);
+
+    for (const tag of themeTags) {
+
+        const group = colorTags.findIndex(chosen =>
+            isNearCopy(tagCards[tag], tagCards[chosen])
+        );
+
+        if (group !== -1) {
+            colorGroupOfTag[tag] = group;
+        } else if (colorTags.length < THEME_COLORS) {
+            colorGroupOfTag[tag] = colorTags.length;
+            colorTags.push(tag);
+        }
+    }
+}
+
+function points(value, topScore) {
+    const rounded = Math.round(value / topScore * 100);
+    return rounded > 0 ? String(rounded) : "<1";
+}
+
+function otherTagsTip(otherParts, topScore) {
+
+    const sorted = otherParts.sort((a, b) => b[1] - a[1]);
+
+    const lines = sorted
+        .slice(0, OTHER_TAGS_LISTED)
+        .map(([tag, value]) => `${tag}: ${points(value, topScore)}`);
+
+    if (sorted.length > OTHER_TAGS_LISTED) {
+        lines.push(`and ${sorted.length - OTHER_TAGS_LISTED} more`);
+    }
+
+    return lines.join("\n");
+}
+
+function scoreSegmentsHtml(parts, topScore) {
+
+    const values = colorTags.map(() => 0);
+    const otherParts = [];
+
+    for (const [tag, value] of Object.entries(parts)) {
+        if (tag in colorGroupOfTag) {
+            values[colorGroupOfTag[tag]] += value;
+        } else {
+            otherParts.push([tag, value]);
+        }
+    }
+
+    const other =
+        otherParts.reduce((sum, [, value]) => sum + value, 0);
+
+    return [...values, other]
+        .map((value, i) => {
+
+            if (value <= 0) {
+                return "";
+            }
+
+            const isOther = i === colorTags.length;
+            const colorClass = isOther ? "theme-other" : `theme-${i + 1}`;
+            const tip = isOther
+                ? `other tags: ${points(value, topScore)}\n` + otherTagsTip(otherParts, topScore)
+                : `${colorTags[i]}: ${points(value, topScore)}`;
+
+            return `<span class="score-bar ${colorClass}" data-tip="${escapeHtml(tip)}" style="width: ${value / topScore * 100}%"></span>`;
+        })
+        .join("");
+}
+
+function themeLegendHtml() {
+
+    const items = [...colorTags, "other tags"]
+        .map((tag, i) => {
+
+            const colorClass =
+                i < colorTags.length ? `theme-${i + 1}` : "theme-other";
+
+            return `<span class="legend-item"><span class="legend-swatch ${colorClass}"></span>${escapeHtml(tag)}</span>`;
+        })
+        .join("");
+
+    return `<div class="theme-legend">${items}</div>`;
+}
+
+// Scores are shown out of 100, relative to the top card.
+function scoreTableHtml(scoredCards) {
+
+    const topScore = scoredCards[0]?.score || 1;
+
+    const rows = scoredCards
+        .map(({ name, score, parts }) => {
 
             const percent = Math.round(score / topScore * 100);
 
@@ -311,20 +435,28 @@ function renderCardSynergy() {
                 <td>
                     <div class="score">
                         <span class="score-number">${percent}</span>
-                        <span class="score-track">
-                            <span class="score-bar" style="width: ${percent}%"></span>
-                        </span>
+                        <span class="score-track">${scoreSegmentsHtml(parts, topScore)}</span>
                     </div>
                 </td>
             </tr>`;
         })
         .join("");
 
-    document.getElementById("cardSynergy").innerHTML = `
-        <table>
+    return themeLegendHtml() + `
+        <table class="score-table">
             <tr><th>Card</th><th>Score</th></tr>
             ${rows}
         </table>`;
+}
+
+function renderCardSynergy() {
+
+    if (synergyRanking.length === 0) {
+        return;
+    }
+
+    document.getElementById("cardSynergy").innerHTML =
+        scoreTableHtml(synergyRanking);
 }
 
 // Scores cards outside the deck the same way as cards in it, then multiplies by
@@ -366,21 +498,16 @@ function suggestCards(results) {
             continue;
         }
 
-        let connection = 0;
+        const { score, parts } =
+            scoreConnections(themeTags, cards, tagValues, null);
 
-        for (const card of cards) {
+        const focus = themeTags.length / tags.length;
 
-            const sharedValues = themeTags
-                .filter(tag => card.tags.includes(tag))
-                .map(tag => tagValues[tag]);
-
-            connection += Math.max(0, ...sharedValues);
+        for (const tag in parts) {
+            parts[tag] *= focus;
         }
 
-        scored.push({
-            name,
-            score: connection * themeTags.length / tags.length
-        });
+        scored.push({ name, score: score * focus, parts });
     }
 
     return scored
@@ -389,8 +516,7 @@ function suggestCards(results) {
                 b.score - a.score ||
                 a.name.localeCompare(b.name)
         )
-        .slice(0, SUGGESTED_CARDS)
-        .map(({ name }) => name);
+        .slice(0, SUGGESTED_CARDS);
 }
 
 function renderSuggestedCards(results) {
@@ -398,9 +524,7 @@ function renderSuggestedCards(results) {
     const cards = suggestCards(results);
 
     document.getElementById("suggestedCards").innerHTML =
-        cards.length > 0
-            ? `<div class="combo">${cards.map(cardNameHtml).join("<br>")}</div>`
-            : "";
+        cards.length > 0 ? scoreTableHtml(cards) : "";
 }
 
 function selectedTagGroups() {
@@ -1246,6 +1370,7 @@ function analyzeDeck() {
 
         renderProblems(notFound, results);
         synergyRanking = rankCardsBySynergy(results);
+        chooseColorTags(synergyRanking, results);
 
         renderCardSynergy();
         renderSuggestedCards(results);
@@ -1269,9 +1394,7 @@ function analyzeDeck() {
 }
 
 // The deck list has no id, so it always loads expanded.
-function moveCardPreview(event) {
-
-    const preview = document.getElementById("cardPreview");
+function moveNearMouse(preview, event) {
 
     const fitsOnRight =
         event.clientX + PREVIEW_GAP + preview.offsetWidth < window.innerWidth;
@@ -1336,6 +1459,34 @@ function setUpCardViewer() {
     });
 }
 
+function setUpBarTips() {
+
+    const tip = document.getElementById("barTip");
+
+    document.addEventListener("mouseover", event => {
+
+        const segment = event.target.closest("[data-tip]");
+
+        if (segment) {
+            tip.textContent = segment.dataset.tip;
+            tip.hidden = false;
+            moveNearMouse(tip, event);
+        }
+    });
+
+    document.addEventListener("mousemove", event => {
+        if (!tip.hidden) {
+            moveNearMouse(tip, event);
+        }
+    });
+
+    document.addEventListener("mouseout", event => {
+        if (event.target.closest("[data-tip]")) {
+            tip.hidden = true;
+        }
+    });
+}
+
 function setUpCardPreview() {
 
     const preview = document.getElementById("cardPreview");
@@ -1343,7 +1494,7 @@ function setUpCardPreview() {
     // Stays hidden until loaded, so the last card never flashes up first.
     preview.addEventListener("load", () => {
         preview.classList.add("visible");
-        moveCardPreview(lastMouse);
+        moveNearMouse(preview, lastMouse);
     });
 
     document.addEventListener("mouseover", event => {
@@ -1369,9 +1520,26 @@ function setUpCardPreview() {
         lastMouse = event;
 
         if (preview.classList.contains("visible")) {
-            moveCardPreview(event);
+            moveNearMouse(preview, event);
         }
     });
+}
+
+// The button sits inside the section's title, so the click mustn't also
+// open or close the section.
+function toggleHelp(event, button) {
+
+    event.preventDefault();
+
+    const section = button.closest("details");
+    const help = section.querySelector(".help");
+
+    help.hidden = !help.hidden;
+    button.setAttribute("aria-expanded", String(!help.hidden));
+
+    if (!help.hidden) {
+        section.open = true;
+    }
 }
 
 function setUpSavedSections() {
@@ -1448,5 +1616,6 @@ async function showVisitorCount() {
 
 setUpSavedSections();
 setUpCardPreview();
+setUpBarTips();
 setUpCardViewer();
 showVisitorCount();
